@@ -1,0 +1,168 @@
+import { Injectable } from '@angular/core';
+import { Firestore, collection, doc, addDoc, getDocs, query, where, orderBy, Timestamp } from '@angular/fire/firestore';
+import { Functions, httpsCallable } from '@angular/fire/functions';
+import { Auth } from '@angular/fire/auth';
+
+export interface ChatSession {
+  id?: string;
+  uid: string;
+  title: string;
+  createdAt: Date;
+}
+
+export interface ChatMessage {
+  id?: string;
+  role: 'user' | 'assistant';
+  content: string;
+  sources?: ChatSource[];
+  createdAt: Date;
+}
+
+export interface ChatSource {
+  docId: string;
+  chunkId: string;
+  page: number;
+  score: number;
+  label: string;
+}
+
+export interface ChatResponse {
+  answer: string;
+  sources?: ChatSource[];
+}
+
+@Injectable({
+  providedIn: 'root'
+})
+export class ChatService {
+  private chatRag = httpsCallable<{
+    sessionId: string;
+    message: string;
+    k?: number;
+    restrictDocId?: string;
+  }, ChatResponse>(this.functions, 'chatRag');
+
+  constructor(
+    private firestore: Firestore,
+    private functions: Functions,
+    private auth: Auth
+  ) { }
+
+  async createSession(title?: string): Promise<string> {
+    if (!this.auth.currentUser) {
+      throw new Error('User not authenticated');
+    }
+
+    const uid = this.auth.currentUser.uid;
+    const sessionData: Omit<ChatSession, 'id'> = {
+      uid,
+      title: title || `Chat ${new Date().toLocaleString()}`,
+      createdAt: new Date()
+    };
+
+    const sessionRef = await addDoc(collection(this.firestore, 'sessions'), sessionData);
+    return sessionRef.id;
+  }
+
+  async getUserSessions(): Promise<ChatSession[]> {
+    if (!this.auth.currentUser) {
+      return [];
+    }
+
+    const uid = this.auth.currentUser.uid;
+    const q = query(
+      collection(this.firestore, 'sessions'),
+      where('uid', '==', uid),
+      orderBy('createdAt', 'desc')
+    );
+
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      createdAt: (doc.data()['createdAt'] as Timestamp).toDate()
+    } as ChatSession));
+  }
+
+  async getSessionMessages(sessionId: string): Promise<ChatMessage[]> {
+    const q = query(
+      collection(this.firestore, `sessions/${sessionId}/messages`),
+      orderBy('createdAt', 'asc')
+    );
+
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      createdAt: (doc.data()['createdAt'] as Timestamp).toDate()
+    } as ChatMessage));
+  }
+
+  async sendMessage(sessionId: string, message: string, restrictDocId?: string): Promise<ChatMessage> {
+    if (!this.auth.currentUser) {
+      throw new Error('User not authenticated');
+    }
+
+    const uid = this.auth.currentUser.uid;
+
+    // Save user message
+    const userMessage: Omit<ChatMessage, 'id'> = {
+      role: 'user',
+      content: message,
+      createdAt: new Date()
+    };
+
+    const userMessageRef = await addDoc(
+      collection(this.firestore, `sessions/${sessionId}/messages`),
+      userMessage
+    );
+
+    try {
+      // Get RAG response
+      const { data } = await this.chatRag({
+        sessionId,
+        message,
+        k: 8,
+        restrictDocId
+      });
+
+      // Save assistant message
+      const assistantMessage: Omit<ChatMessage, 'id'> = {
+        role: 'assistant',
+        content: data.answer,
+        sources: data.sources,
+        createdAt: new Date()
+      };
+
+      const assistantMessageRef = await addDoc(
+        collection(this.firestore, `sessions/${sessionId}/messages`),
+        assistantMessage
+      );
+
+      return {
+        id: assistantMessageRef.id,
+        ...assistantMessage
+      };
+
+    } catch (error) {
+      console.error('Error getting RAG response:', error);
+      
+      // Save error message
+      const errorMessage: Omit<ChatMessage, 'id'> = {
+        role: 'assistant',
+        content: 'Sorry, I encountered an error processing your question. Please try again.',
+        createdAt: new Date()
+      };
+
+      const errorMessageRef = await addDoc(
+        collection(this.firestore, `sessions/${sessionId}/messages`),
+        errorMessage
+      );
+
+      return {
+        id: errorMessageRef.id,
+        ...errorMessage
+      };
+    }
+  }
+}

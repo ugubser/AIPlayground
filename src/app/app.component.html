@@ -1,0 +1,29 @@
+<div class="app-container">
+  <header class="app-header">
+    <h1>🤖 {{ title }}</h1>
+    <div class="auth-section" *ngIf="user$ | async as user; else signInButton">
+      <span class="user-info">Signed in</span>
+      <button class="btn btn-secondary" (click)="signOut()">Sign Out</button>
+    </div>
+    <ng-template #signInButton>
+      <div class="auth-section">
+        <span *ngIf="loading" class="loading">Signing in...</span>
+        <button *ngIf="!loading" class="btn btn-primary" (click)="signInAnonymously()">Sign In</button>
+      </div>
+    </ng-template>
+  </header>
+
+  <main class="main-content" *ngIf="user$ | async; else authRequired">
+    <router-outlet></router-outlet>
+  </main>
+
+  <ng-template #authRequired>
+    <div class="auth-required">
+      <h2>Please sign in to continue</h2>
+      <p>You need to be authenticated to use the chatbot.</p>
+      <button class="btn btn-primary" (click)="signInAnonymously()" [disabled]="loading">
+        {{ loading ? 'Signing in...' : 'Sign In Anonymously' }}
+      </button>
+    </div>
+  </ng-template>
+</div>

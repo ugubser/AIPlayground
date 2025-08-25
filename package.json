@@ -1,0 +1,50 @@
+{
+  "name": "firebase-rag-app",
+  "version": "0.0.0",
+  "scripts": {
+    "ng": "ng",
+    "prebuild": "node scripts/build-env.js",
+    "start": "ng serve --port 4200",
+    "build": "ng build",
+    "build:prod": "npm run prebuild && ng build --configuration production",
+    "watch": "ng build --watch --configuration development",
+    "test": "ng test",
+    "emulators": "npm run prebuild && firebase emulators:start",
+    "emulators:hosting": "npm run build && firebase emulators:start",
+    "build:functions": "cd functions && npm run build",
+    "deploy": "npm run build:prod && npm run build:functions && firebase deploy"
+  },
+  "private": true,
+  "dependencies": {
+    "@angular/animations": "^17.3.0",
+    "@angular/common": "^17.3.0",
+    "@angular/compiler": "^17.3.0",
+    "@angular/core": "^17.3.0",
+    "@angular/fire": "^17.0.0",
+    "@angular/forms": "^17.3.0",
+    "@angular/platform-browser": "^17.3.0",
+    "@angular/platform-browser-dynamic": "^17.3.0",
+    "@angular/router": "^17.3.0",
+    "@langchain/textsplitters": "^0.0.3",
+    "firebase": "^12.1.0",
+    "langchain": "^0.2.0",
+    "pdfjs-dist": "^4.4.168",
+    "rxjs": "~7.8.0",
+    "tslib": "^2.3.0",
+    "zone.js": "~0.14.3"
+  },
+  "devDependencies": {
+    "@angular-devkit/build-angular": "^17.3.17",
+    "@angular/cli": "^17.3.17",
+    "@angular/compiler-cli": "^17.3.0",
+    "@types/jasmine": "~5.1.0",
+    "dotenv": "^17.2.1",
+    "jasmine-core": "~5.1.0",
+    "karma": "~6.4.0",
+    "karma-chrome-launcher": "~3.2.0",
+    "karma-coverage": "~2.2.0",
+    "karma-jasmine": "~5.1.0",
+    "karma-jasmine-html-reporter": "~2.1.0",
+    "typescript": "~5.4.2"
+  }
+}
