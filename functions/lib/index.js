@@ -38,8 +38,10 @@ exports.embedChunks = functions
     }
     const key = process.env.TOGETHER_API_KEY;
     if (!key) {
+        console.error('TOGETHER_API_KEY not found in environment');
         throw new functions.https.HttpsError('internal', 'TOGETHER_API_KEY not configured');
     }
+    console.log('TOGETHER_API_KEY found:', !!key);
     try {
         console.log(`Processing ${texts.length} texts for embeddings`);
         const response = await (0, node_fetch_1.default)(TOGETHER_URL, {
@@ -97,6 +99,7 @@ exports.chatRag = functions
         // 1) Embed the query
         const togetherKey = process.env.TOGETHER_API_KEY;
         if (!togetherKey) {
+            console.error('TOGETHER_API_KEY not found for chat');
             throw new functions.https.HttpsError('internal', 'TOGETHER_API_KEY not configured');
         }
         const embResponse = await (0, node_fetch_1.default)(TOGETHER_URL, {
@@ -119,13 +122,35 @@ exports.chatRag = functions
             throw new functions.https.HttpsError('internal', 'Empty query embedding');
         }
         // 2) Retrieve top-K chunks (brute-force similarity search)
-        let chunksQuery = db.collectionGroup('chunks')
-            .where('uid', '==', uid)
-            .limit(5000);
-        if (restrictDocId) {
-            chunksQuery = chunksQuery.where('docId', '==', restrictDocId);
+        console.log(`Searching for chunks with uid: ${uid}, restrictDocId: ${restrictDocId}`);
+        let chunksSnapshot;
+        try {
+            // Try simple query first if restrictDocId is provided
+            if (restrictDocId) {
+                console.log(`Trying compound query: uid=${uid}, docId=${restrictDocId}`);
+                let chunksQuery = db.collectionGroup('chunks')
+                    .where('uid', '==', uid)
+                    .where('docId', '==', restrictDocId)
+                    .limit(5000);
+                console.log('About to execute compound chunks query...');
+                chunksSnapshot = await chunksQuery.get();
+                console.log('Compound chunks query executed successfully');
+            }
+            else {
+                console.log(`Trying simple query: uid=${uid}`);
+                let chunksQuery = db.collectionGroup('chunks')
+                    .where('uid', '==', uid)
+                    .limit(5000);
+                console.log('About to execute simple chunks query...');
+                chunksSnapshot = await chunksQuery.get();
+                console.log('Simple chunks query executed successfully');
+            }
         }
-        const chunksSnapshot = await chunksQuery.get();
+        catch (queryError) {
+            console.error('Error executing chunks query:', queryError);
+            console.error('Query details:', { uid, restrictDocId });
+            throw queryError;
+        }
         if (chunksSnapshot.empty) {
             return {
                 answer: "I don't have any documents to search through. Please upload some PDF documents first."
@@ -155,6 +180,7 @@ exports.chatRag = functions
         // 4) Generate response with OpenRouter
         const openrouterKey = process.env.OPENROUTER_API_KEY;
         if (!openrouterKey) {
+            console.error('OPENROUTER_API_KEY not found');
             throw new functions.https.HttpsError('internal', 'OPENROUTER_API_KEY not configured');
         }
         const llmResponse = await (0, node_fetch_1.default)(OPENROUTER_URL, {

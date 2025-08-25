@@ -42,16 +42,20 @@ function createEnvironmentFile(templatePath, outputPath) {
   console.log(`Created environment file: ${outputPath}`);
 }
 
-// Create development environment
-createEnvironmentFile(
-  'src/environments/environment.template.ts',
-  'src/environments/environment.ts'
-);
+const buildType = process.argv[2] || 'development';
 
-// Create production environment  
-createEnvironmentFile(
-  'src/environments/environment.prod.template.ts',
-  'src/environments/environment.prod.ts'
-);
-
-console.log('Environment files generated successfully!');
+if (buildType === 'production') {
+  // For production builds, create production environment
+  createEnvironmentFile(
+    'src/environments/environment.prod.template.ts',
+    'src/environments/environment.prod.ts'
+  );
+  console.log('Production environment file generated successfully!');
+} else {
+  // For development builds, create development environment
+  createEnvironmentFile(
+    'src/environments/environment.template.ts',
+    'src/environments/environment.ts'
+  );
+  console.log('Development environment file generated successfully!');
+}

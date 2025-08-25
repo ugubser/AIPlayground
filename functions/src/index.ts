@@ -42,8 +42,10 @@ export const embedChunks = functions
 
     const key = process.env.TOGETHER_API_KEY;
     if (!key) {
+      console.error('TOGETHER_API_KEY not found in environment');
       throw new functions.https.HttpsError('internal', 'TOGETHER_API_KEY not configured');
     }
+    console.log('TOGETHER_API_KEY found:', !!key);
 
     try {
       console.log(`Processing ${texts.length} texts for embeddings`);
@@ -112,6 +114,7 @@ export const chatRag = functions
       // 1) Embed the query
       const togetherKey = process.env.TOGETHER_API_KEY;
       if (!togetherKey) {
+        console.error('TOGETHER_API_KEY not found for chat');
         throw new functions.https.HttpsError('internal', 'TOGETHER_API_KEY not configured');
       }
 
@@ -139,15 +142,36 @@ export const chatRag = functions
       }
 
       // 2) Retrieve top-K chunks (brute-force similarity search)
-      let chunksQuery = db.collectionGroup('chunks')
-        .where('uid', '==', uid)
-        .limit(5000);
-
-      if (restrictDocId) {
-        chunksQuery = chunksQuery.where('docId', '==', restrictDocId);
+      console.log(`Searching for chunks with uid: ${uid}, restrictDocId: ${restrictDocId}`);
+      
+      let chunksSnapshot;
+      try {
+        // Try simple query first if restrictDocId is provided
+        if (restrictDocId) {
+          console.log(`Trying compound query: uid=${uid}, docId=${restrictDocId}`);
+          let chunksQuery = db.collectionGroup('chunks')
+            .where('uid', '==', uid)
+            .where('docId', '==', restrictDocId)
+            .limit(5000);
+          
+          console.log('About to execute compound chunks query...');
+          chunksSnapshot = await chunksQuery.get();
+          console.log('Compound chunks query executed successfully');
+        } else {
+          console.log(`Trying simple query: uid=${uid}`);
+          let chunksQuery = db.collectionGroup('chunks')
+            .where('uid', '==', uid)
+            .limit(5000);
+          
+          console.log('About to execute simple chunks query...');
+          chunksSnapshot = await chunksQuery.get();
+          console.log('Simple chunks query executed successfully');
+        }
+      } catch (queryError) {
+        console.error('Error executing chunks query:', queryError);
+        console.error('Query details:', { uid, restrictDocId });
+        throw queryError;
       }
-
-      const chunksSnapshot = await chunksQuery.get();
       
       if (chunksSnapshot.empty) {
         return { 
@@ -190,6 +214,7 @@ export const chatRag = functions
       // 4) Generate response with OpenRouter
       const openrouterKey = process.env.OPENROUTER_API_KEY;
       if (!openrouterKey) {
+        console.error('OPENROUTER_API_KEY not found');
         throw new functions.https.HttpsError('internal', 'OPENROUTER_API_KEY not configured');
       }
 
