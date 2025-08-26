@@ -18,6 +18,18 @@
       ]
     }
   },
+  "chat": {
+    "LLM": {
+      "openrouter.ai": [
+        "openai/gpt-oss-20b:free",
+        "z-ai/glm-4.5-air:free",
+        "meta-llama/llama-4-maverick:free"
+      ],
+      "together.ai": [
+        "deepseek-ai/DeepSeek-R1-Distill-Llama-70B-free"
+      ]
+    }
+  },
   "vision": {
     "VISION": {
       "openrouter.ai": [

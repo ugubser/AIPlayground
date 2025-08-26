@@ -1,12 +1,13 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterOutlet } from '@angular/router';
+import { RouterOutlet, NavigationEnd, Router } from '@angular/router';
 import { AuthService } from './services/auth.service';
 import { GlobalModelSelectionService } from './services/global-model-selection.service';
 import { ModelSelectorComponent } from './components/model-selector/model-selector.component';
 import { RAGModelSelection } from './services/models-config.service';
 import { Observable } from 'rxjs';
 import { User } from '@angular/fire/auth';
+import { filter } from 'rxjs/operators';
 
 @Component({
   selector: 'app-root',
@@ -16,13 +17,15 @@ import { User } from '@angular/fire/auth';
   styleUrl: './app.component.css'
 })
 export class AppComponent implements OnInit {
-  title = 'Firebase RAG Chatbot';
+  title = 'Vanguard Signals AI Playground';
   user$: Observable<User | null>;
   loading = false;
+  currentAppName = 'rag';
 
   constructor(
     private authService: AuthService,
-    private globalModelSelection: GlobalModelSelectionService
+    private globalModelSelection: GlobalModelSelectionService,
+    private router: Router
   ) {
     this.user$ = this.authService.user$;
   }
@@ -33,6 +36,11 @@ export class AppComponent implements OnInit {
       if (!user && !this.loading) {
         this.signInAnonymously();
       }
+    });
+
+    // Subscribe to current app changes
+    this.globalModelSelection.currentApp$.subscribe(appName => {
+      this.currentAppName = appName;
     });
   }
 

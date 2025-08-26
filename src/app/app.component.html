@@ -5,7 +5,7 @@
     <!-- Global Model Configuration -->
     <div class="model-config-section" *ngIf="user$ | async">
       <app-model-selector 
-        appName="rag"
+        [appName]="currentAppName"
         [showCurrentSelection]="false"
         (selectionChange)="onGlobalModelSelectionChange($event)">
       </app-model-selector>

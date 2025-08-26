@@ -433,3 +433,119 @@ export const chatRag = functions
       throw new functions.https.HttpsError('internal', 'Failed to process chat request');
     }
   });
+
+export const generalChat = functions
+  .runWith({ timeoutSeconds: 60, memory: '1GB' })
+  .https.onCall(async (data, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError('unauthenticated', 'Login required');
+    }
+
+    const { message, llmProvider, llmModel } = data;
+
+    // Use provided models or defaults
+    const actualLlmProvider = llmProvider || 'openrouter.ai';
+    const actualLlmModel = llmModel || 'openai/gpt-oss-20b:free';
+
+    console.log('General chat request:', { actualLlmProvider, actualLlmModel });
+
+    if (!message) {
+      throw new functions.https.HttpsError('invalid-argument', 'message required');
+    }
+
+    try {
+      // Get LLM API key
+      const llmApiKeyEnvVar = actualLlmProvider === 'together.ai' ? 'TOGETHER_API_KEY' : 'OPENROUTER_API_KEY';
+      const llmKey = process.env[llmApiKeyEnvVar];
+      if (!llmKey) {
+        console.error(`${llmApiKeyEnvVar} not found`);
+        throw new functions.https.HttpsError('internal', `${llmApiKeyEnvVar} not configured`);
+      }
+
+      const llmApiUrl = actualLlmProvider === 'together.ai' 
+        ? 'https://api.together.xyz/v1/chat/completions'
+        : 'https://openrouter.ai/api/v1/chat/completions';
+
+      const llmRequestBody = {
+        model: actualLlmModel,
+        messages: [
+          { role: 'user', content: message }
+        ],
+        temperature: 0.7,
+        max_tokens: 2000
+      };
+
+      const llmHeaders: { [key: string]: string } = {
+        'Authorization': `Bearer ${llmKey}`,
+        'Content-Type': 'application/json'
+      };
+
+      // Add OpenRouter-specific headers
+      if (actualLlmProvider === 'openrouter.ai') {
+        llmHeaders['HTTP-Referer'] = 'https://aiplayground-6e5be.web.app';
+        llmHeaders['X-Title'] = 'Vanguard Signals AI Playground';
+      }
+
+      if (isEmulator) {
+        console.log('🔍 General Chat LLM Request:', JSON.stringify({
+          provider: actualLlmProvider,
+          model: actualLlmModel,
+          url: llmApiUrl,
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${llmKey.substring(0, 10)}...`,
+            'Content-Type': 'application/json',
+            ...(actualLlmProvider === 'openrouter.ai' && {
+              'HTTP-Referer': 'https://aiplayground-6e5be.web.app',
+              'X-Title': 'Vanguard Signals AI Playground'
+            })
+          },
+          body: {
+            ...llmRequestBody,
+            messages: [{ role: 'user', content: `${message.substring(0, 100)}...` }]
+          }
+        }, null, 2));
+      }
+
+      const llmResponse = await fetch(llmApiUrl, {
+        method: 'POST',
+        headers: llmHeaders,
+        body: JSON.stringify(llmRequestBody)
+      });
+
+      if (!llmResponse.ok) {
+        const errorText = await llmResponse.text();
+        console.error('LLM API error:', llmResponse.status, errorText);
+        throw new functions.https.HttpsError('internal', 'Failed to generate response');
+      }
+
+      const llmJson = await llmResponse.json() as any;
+      const answer = llmJson.choices?.[0]?.message?.content ?? 'Sorry, I could not generate a response.';
+
+      if (isEmulator) {
+        console.log('📤 General Chat LLM Response:', JSON.stringify({
+          provider: actualLlmProvider,
+          model: actualLlmModel,
+          status: llmResponse.status,
+          statusText: llmResponse.statusText,
+          data: {
+            model: llmJson.model,
+            usage: llmJson.usage,
+            answerLength: answer.length,
+            choicesCount: llmJson.choices?.length || 0
+          }
+        }, null, 2));
+      }
+
+      console.log(`Successfully generated general chat response`);
+
+      return { answer };
+
+    } catch (error) {
+      console.error('Error in generalChat:', error);
+      if (error instanceof functions.https.HttpsError) {
+        throw error;
+      }
+      throw new functions.https.HttpsError('internal', 'Failed to process general chat request');
+    }
+  });

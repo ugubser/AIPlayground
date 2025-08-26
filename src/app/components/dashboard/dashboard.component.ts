@@ -23,15 +23,20 @@ export class DashboardComponent implements OnInit {
   uploading = false;
   uploadProgress = '';
 
-  // Chat
+  // RAG Chat (document-based)
   sessions: ChatSession[] = [];
   currentSession: ChatSession | null = null;
   messages: ChatMessage[] = [];
   messageInput = '';
   sending = false;
 
+  // General Chat (no documents)
+  generalMessages: ChatMessage[] = [];
+  generalMessageInput = '';
+  sendingGeneral = false;
+
   // UI State
-  activeTab: 'documents' | 'chat' = 'documents';
+  activeTab: 'rag' | 'chat' = 'rag';
   dragOver = false;
 
   constructor(
@@ -147,7 +152,7 @@ export class DashboardComponent implements OnInit {
       if (newSession) {
         await this.selectSession(newSession);
       }
-      this.activeTab = 'chat';
+      // Don't switch tabs - stay on current tab
     } catch (error) {
       console.error('Error creating session:', error);
     }
@@ -211,7 +216,56 @@ export class DashboardComponent implements OnInit {
   }
 
 
-  setActiveTab(tab: 'documents' | 'chat') {
+  async sendGeneralMessage() {
+    if (!this.generalMessageInput.trim() || this.sendingGeneral) {
+      return;
+    }
+
+    const messageText = this.generalMessageInput.trim();
+    this.generalMessageInput = '';
+    this.sendingGeneral = true;
+
+    // Add user message to UI immediately
+    const userMessage: ChatMessage = {
+      role: 'user',
+      content: messageText,
+      createdAt: new Date()
+    };
+    this.generalMessages.push(userMessage);
+
+    try {
+      // Use chat service for general conversation (no document context)
+      const response = await this.chatService.sendGeneralMessage(
+        messageText,
+        this.globalModelSelection.getSelectionForRequest()
+      );
+      
+      this.generalMessages.push(response);
+      
+    } catch (error) {
+      console.error('Error sending general message:', error);
+      this.generalMessages.push({
+        role: 'assistant',
+        content: 'Sorry, there was an error processing your message. Please try again.',
+        createdAt: new Date()
+      });
+    } finally {
+      this.sendingGeneral = false;
+    }
+  }
+
+  onGeneralEnterKey(event: KeyboardEvent) {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      this.sendGeneralMessage();
+    }
+  }
+
+  setActiveTab(tab: 'rag' | 'chat') {
     this.activeTab = tab;
+    
+    // Update global app context for model selector
+    const appName = tab === 'chat' ? 'chat' : 'rag';
+    this.globalModelSelection.updateCurrentApp(appName);
   }
 }

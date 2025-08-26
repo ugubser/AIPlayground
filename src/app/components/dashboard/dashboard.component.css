@@ -1,5 +1,5 @@
 .dashboard {
-  height: 100vh;
+  height: calc(100vh - 160px); /* Subtract header height */
   display: flex;
   flex-direction: column;
 }
@@ -42,7 +42,7 @@
 /* Documents Section */
 .documents-section {
   padding: 2rem;
-  height: 100%;
+  /* height: 100%; */
   overflow-y: auto;
 }
 
@@ -592,4 +592,230 @@
 
 .btn-primary:hover:not(:disabled) {
   background: #0056b3;
+}
+
+/* RAG Layout */
+.rag-layout {
+  display: flex;
+  height: 100%;
+}
+
+.rag-sidebar {
+  width: 320px;
+  background: white;
+  border-right: 1px solid #dee2e6;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.rag-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Upload Section */
+.upload-section {
+  padding: 1rem;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.upload-section .upload-area {
+  border: 2px dashed #dee2e6;
+  border-radius: 6px;
+  padding: 1.5rem 1rem;
+  text-align: center;
+  transition: all 0.2s;
+  background: #f8f9fa;
+}
+
+.upload-section .upload-area.drag-over {
+  border-color: #007bff;
+  background: #f0f8ff;
+}
+
+.upload-section .upload-area.uploading {
+  border-color: #28a745;
+  background: #f0fff4;
+}
+
+.upload-section .upload-icon {
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.upload-section h4 {
+  margin: 0 0 0.25rem 0;
+  font-size: 0.9rem;
+  color: #495057;
+}
+
+.upload-section p {
+  margin: 0 0 1rem 0;
+  font-size: 0.8rem;
+  color: #6c757d;
+}
+
+/* Sessions Section */
+.sessions-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-bottom: 1px solid #dee2e6;
+}
+
+/* Documents Section */
+.documents-section {
+  padding: 1rem;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.documents-section h4 {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.9rem;
+  color: #495057;
+}
+
+.document-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.document-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s;
+  border: 1px solid transparent;
+}
+
+.document-item:hover {
+  background: #f8f9fa;
+}
+
+.document-item.selected {
+  background: #e7f3ff;
+  border-color: #007bff;
+}
+
+.document-item.processing {
+  opacity: 0.7;
+}
+
+.document-item.error {
+  border-color: #dc3545;
+  background: #fff5f5;
+}
+
+.document-item .doc-icon {
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.document-item .doc-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.document-item .doc-name {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #495057;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.document-item .doc-status {
+  font-size: 0.7rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 8px;
+  font-weight: 500;
+  text-transform: capitalize;
+  margin-top: 0.25rem;
+  display: inline-block;
+}
+
+.document-item .doc-status.completed {
+  background: #d4edda;
+  color: #155724;
+}
+
+.document-item .doc-status.processing {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.document-item .doc-status.error {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.empty-docs {
+  text-align: center;
+  padding: 1rem;
+  color: #6c757d;
+  font-size: 0.8rem;
+}
+
+/* General Chat Container */
+.general-chat-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 2rem;
+}
+
+.general-chat-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.general-chat-header h3 {
+  margin: 0 0 0.5rem 0;
+  color: #495057;
+  font-size: 1.3rem;
+}
+
+.general-chat-header p {
+  margin: 0;
+  color: #6c757d;
+  font-size: 0.95rem;
+}
+
+/* RAG Chat Empty State */
+.rag-chat-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+}
+
+.empty-chat-message {
+  text-align: center;
+  max-width: 400px;
+}
+
+.empty-chat-message h4 {
+  margin: 0 0 1rem 0;
+  color: #495057;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.empty-chat-message p {
+  margin: 0;
+  color: #6c757d;
+  font-size: 0.95rem;
+  line-height: 1.5;
 }

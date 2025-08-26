@@ -3,9 +3,9 @@
   <nav class="tab-nav">
     <button 
       class="tab-btn" 
-      [class.active]="activeTab === 'documents'"
-      (click)="setActiveTab('documents')">
-      📄 Documents ({{ documents.length }})
+      [class.active]="activeTab === 'rag'"
+      (click)="setActiveTab('rag')">
+      🔍 RAG ({{ documents.length }})
     </button>
     <button 
       class="tab-btn" 
@@ -15,99 +15,96 @@
     </button>
   </nav>
 
-  <!-- Documents Tab -->
-  <div class="tab-content" *ngIf="activeTab === 'documents'">
-    <div class="documents-section">
+  <!-- RAG Tab -->
+  <div class="tab-content" *ngIf="activeTab === 'rag'">
+    <div class="rag-layout">
       
-      <!-- File Upload Area -->
-      <div class="upload-area" 
-           [class.drag-over]="dragOver"
-           [class.uploading]="uploading"
-           (dragover)="onDragOver($event)"
-           (dragleave)="onDragLeave($event)"
-           (drop)="onDrop($event)">
-        
-        <div class="upload-content" *ngIf="!uploading">
-          <div class="upload-icon">📤</div>
-          <h3>Upload PDF Document</h3>
-          <p>Drag and drop a PDF file here, or click to select</p>
-          <input 
-            type="file" 
-            accept="application/pdf" 
-            (change)="onFileSelect($event)"
-            #fileInput
-            style="display: none">
-          <button class="btn btn-primary" (click)="fileInput.click()">
-            Choose File
-          </button>
-        </div>
-
-        <div class="upload-progress" *ngIf="uploading">
-          <div class="spinner"></div>
-          <p>{{ uploadProgress }}</p>
-        </div>
-      </div>
-
-      <!-- Documents List -->
-      <div class="documents-list" *ngIf="documents.length > 0">
-        <h3>Your Documents</h3>
-        <div class="document-grid">
-          <div 
-            class="document-card" 
-            *ngFor="let doc of documents"
-            [class.selected]="selectedDocument?.id === doc.id"
-            [class.processing]="doc.status === 'processing'"
-            [class.error]="doc.status === 'error'"
-            (click)="selectDocument(doc)">
+      <!-- RAG Sidebar -->
+      <aside class="rag-sidebar">
+        <!-- File Upload Area -->
+        <div class="upload-section">
+          <div class="upload-area" 
+               [class.drag-over]="dragOver"
+               [class.uploading]="uploading"
+               (dragover)="onDragOver($event)"
+               (dragleave)="onDragLeave($event)"
+               (drop)="onDrop($event)">
             
-            <div class="doc-icon">
-              <span *ngIf="doc.status === 'completed'">📄</span>
-              <span *ngIf="doc.status === 'processing'" class="processing-icon">⏳</span>
-              <span *ngIf="doc.status === 'error'">❌</span>
+            <div class="upload-content" *ngIf="!uploading">
+              <div class="upload-icon">📤</div>
+              <h4>Upload PDF</h4>
+              <p>Drag & drop or click to select</p>
+              <input 
+                type="file" 
+                accept="application/pdf" 
+                (change)="onFileSelect($event)"
+                #fileInput
+                style="display: none">
+              <button class="btn btn-primary btn-small" (click)="fileInput.click()">
+                Choose File
+              </button>
             </div>
-            
-            <div class="doc-info">
-              <h4>{{ doc.filename }}</h4>
-              <div class="doc-meta">
-                <span class="doc-status" [class]="doc.status">{{ doc.status }}</span>
-                <span class="doc-pages" *ngIf="doc.pageCount > 0">{{ doc.pageCount }} pages</span>
-                <span class="doc-date">{{ doc.createdAt.toLocaleDateString() }}</span>
+
+            <div class="upload-progress" *ngIf="uploading">
+              <div class="spinner"></div>
+              <p>{{ uploadProgress }}</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sessions List -->
+        <div class="sessions-section">
+          <div class="sidebar-header">
+            <h3>RAG Sessions</h3>
+            <button class="btn btn-small btn-primary" (click)="createNewSession()">
+              + New
+            </button>
+          </div>
+
+          <div class="sessions-list">
+            <div 
+              class="session-item"
+              *ngFor="let session of sessions"
+              [class.active]="currentSession?.id === session.id"
+              (click)="selectSession(session)">
+              <div class="session-title">{{ session.title }}</div>
+              <div class="session-date">{{ session.createdAt.toLocaleDateString() }}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Documents List -->
+        <div class="documents-section">
+          <h4>Your Documents ({{ documents.length }})</h4>
+          
+          <div class="document-list" *ngIf="documents.length > 0">
+            <div 
+              class="document-item" 
+              *ngFor="let doc of documents"
+              [class.selected]="selectedDocument?.id === doc.id"
+              [class.processing]="doc.status === 'processing'"
+              [class.error]="doc.status === 'error'"
+              (click)="selectDocument(doc)">
+              
+              <div class="doc-icon">
+                <span *ngIf="doc.status === 'completed'">📄</span>
+                <span *ngIf="doc.status === 'processing'" class="processing-icon">⏳</span>
+                <span *ngIf="doc.status === 'error'">❌</span>
+              </div>
+              
+              <div class="doc-info">
+                <div class="doc-name">{{ doc.filename }}</div>
+                <div class="doc-status" [class]="doc.status">{{ doc.status }}</div>
               </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      <div class="empty-state" *ngIf="documents.length === 0 && !uploading">
-        <p>No documents uploaded yet. Start by uploading your first PDF!</p>
-      </div>
-    </div>
-  </div>
-
-  <!-- Chat Tab -->
-  <div class="tab-content" *ngIf="activeTab === 'chat'">
-    <div class="chat-layout">
-      
-      <!-- Chat Sidebar -->
-      <aside class="chat-sidebar">
-        <div class="sidebar-header">
-          <h3>Chat Sessions</h3>
-          <button class="btn btn-small btn-primary" (click)="createNewSession()">
-            + New Chat
-          </button>
-        </div>
-
-        <div class="sessions-list">
-          <div 
-            class="session-item"
-            *ngFor="let session of sessions"
-            [class.active]="currentSession?.id === session.id"
-            (click)="selectSession(session)">
-            <div class="session-title">{{ session.title }}</div>
-            <div class="session-date">{{ session.createdAt.toLocaleDateString() }}</div>
+          <div class="empty-docs" *ngIf="documents.length === 0 && !uploading">
+            <p>No documents yet</p>
           </div>
         </div>
 
+        <!-- Document Filter -->
         <div class="document-filter" *ngIf="documents.length > 0">
           <h4>Filter by Document</h4>
           <select class="doc-select" [(ngModel)]="selectedDocument">
@@ -120,11 +117,10 @@
             </option>
           </select>
         </div>
-
       </aside>
 
-      <!-- Chat Main -->
-      <main class="chat-main">
+      <!-- RAG Chat Main -->
+      <main class="rag-main">
         <div class="chat-header" *ngIf="currentSession">
           <h2>{{ currentSession.title }}</h2>
           <div class="chat-info" *ngIf="selectedDocument">
@@ -192,13 +188,69 @@
         </div>
 
         <div class="empty-chat" *ngIf="!currentSession">
-          <h3>Welcome to RAG Chatbot! 🤖</h3>
+          <h3>Welcome to RAG Chat! 🤖</h3>
           <p>Create a new chat session to start asking questions about your documents.</p>
           <button class="btn btn-primary" (click)="createNewSession()">
-            Start New Chat
+            Start New RAG Session
           </button>
         </div>
       </main>
+    </div>
+  </div>
+
+  <!-- Chat Tab -->
+  <div class="tab-content" *ngIf="activeTab === 'chat'">
+    <div class="general-chat-container">
+      <div class="general-chat-header">
+        <h3>💬 General Chat</h3>
+        <p>Ask any question - no documents required!</p>
+      </div>
+
+      <div class="messages-container">
+        <div class="messages-list">
+          <div 
+            class="message"
+            *ngFor="let message of generalMessages"
+            [class.user-message]="message.role === 'user'"
+            [class.assistant-message]="message.role === 'assistant'">
+            
+            <div class="message-content">
+              <div class="message-text">{{ message.content }}</div>
+            </div>
+            
+            <div class="message-time">
+              {{ message.createdAt.toLocaleTimeString() }}
+            </div>
+          </div>
+
+          <div class="message assistant-message" *ngIf="sendingGeneral">
+            <div class="message-content">
+              <div class="typing-indicator">
+                <span></span><span></span><span></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="message-input-area">
+          <div class="input-wrapper">
+            <textarea 
+              class="message-input"
+              [(ngModel)]="generalMessageInput"
+              (keydown)="onGeneralEnterKey($event)"
+              placeholder="Ask me anything..."
+              rows="2"
+              [disabled]="sendingGeneral"></textarea>
+            <button 
+              class="send-btn"
+              (click)="sendGeneralMessage()"
+              [disabled]="!generalMessageInput.trim() || sendingGeneral">
+              <span *ngIf="!sendingGeneral">➤</span>
+              <span *ngIf="sendingGeneral" class="sending-icon">⏳</span>
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>

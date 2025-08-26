@@ -43,6 +43,10 @@ export class ChatService {
     restrictDocId?: string;
   }, ChatResponse>(this.functions, 'chatRag');
 
+  private generalChat = httpsCallable<{
+    message: string;
+  }, { answer: string }>(this.functions, 'generalChat');
+
   constructor(
     private firestore: Firestore,
     private functions: Functions,
@@ -181,6 +185,47 @@ export class ChatService {
       return {
         id: errorMessageRef.id,
         ...errorMessage
+      };
+    }
+  }
+
+  async sendGeneralMessage(message: string, modelSelection?: RAGModelSelection): Promise<ChatMessage> {
+    if (!this.auth.currentUser) {
+      throw new Error('User not authenticated');
+    }
+
+    try {
+      const generalRequest: any = {
+        message
+      };
+
+      // Add model selection if provided
+      if (modelSelection) {
+        generalRequest.llmProvider = modelSelection.llm.provider;
+        generalRequest.llmModel = modelSelection.llm.model;
+        console.log('Chat service sending general request with models:', {
+          llmProvider: generalRequest.llmProvider,
+          llmModel: generalRequest.llmModel
+        });
+      } else {
+        console.log('Chat service: No model selection provided for general chat, using defaults');
+      }
+
+      const { data } = await this.generalChat(generalRequest);
+
+      return {
+        role: 'assistant',
+        content: data.answer,
+        createdAt: new Date()
+      };
+
+    } catch (error) {
+      console.error('Error getting general chat response:', error);
+      
+      return {
+        role: 'assistant',
+        content: 'Sorry, I encountered an error processing your question. Please try again.',
+        createdAt: new Date()
       };
     }
   }

@@ -8,6 +8,9 @@ import { ModelsConfigService, RAGModelSelection } from './models-config.service'
 export class GlobalModelSelectionService {
   private currentSelectionSubject = new BehaviorSubject<RAGModelSelection | null>(null);
   public currentSelection$: Observable<RAGModelSelection | null> = this.currentSelectionSubject.asObservable();
+  
+  private currentAppSubject = new BehaviorSubject<string>('rag');
+  public currentApp$: Observable<string> = this.currentAppSubject.asObservable();
 
   constructor(private modelsConfig: ModelsConfigService) {
     // Initialize with default selection
@@ -24,6 +27,21 @@ export class GlobalModelSelectionService {
   updateSelection(selection: RAGModelSelection): void {
     console.log('Global service updating selection to:', selection);
     this.currentSelectionSubject.next(selection);
+  }
+
+  updateCurrentApp(appName: string): void {
+    console.log('Global service updating app to:', appName);
+    this.currentAppSubject.next(appName);
+    
+    // Update model selection to default for the new app
+    const defaultSelection = this.modelsConfig.getDefaultSelection(appName);
+    if (defaultSelection) {
+      this.updateSelection(defaultSelection);
+    }
+  }
+
+  getCurrentApp(): string {
+    return this.currentAppSubject.value;
   }
 
   // Convenience method for components to get current selection synchronously
