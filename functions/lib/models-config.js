@@ -28,19 +28,40 @@ class ModelsConfigService {
         return app[modelType][provider];
     }
     getDefaultSelection(appName) {
-        if (appName !== 'rag')
-            return null;
-        // These should only be used as absolute fallbacks when UI doesn't provide models
-        return {
-            llm: {
-                provider: 'openrouter.ai',
-                model: 'openai/gpt-oss-20b:free'
-            },
-            embed: {
-                provider: 'together.ai',
-                model: 'BAAI/bge-base-en-v1.5'
-            }
-        };
+        if (appName === 'rag') {
+            // These should only be used as absolute fallbacks when UI doesn't provide models
+            return {
+                llm: {
+                    provider: 'openrouter.ai',
+                    model: 'openai/gpt-oss-20b:free'
+                },
+                embed: {
+                    provider: 'together.ai',
+                    model: 'BAAI/bge-base-en-v1.5'
+                }
+            };
+        }
+        else if (appName === 'vision') {
+            return {
+                vision: {
+                    provider: 'openrouter.ai',
+                    model: 'openai/gpt-4o'
+                }
+            };
+        }
+        else if (appName === 'chat') {
+            return {
+                llm: {
+                    provider: 'openrouter.ai',
+                    model: 'openai/gpt-oss-20b:free'
+                },
+                embed: {
+                    provider: 'together.ai',
+                    model: 'BAAI/bge-base-en-v1.5'
+                }
+            };
+        }
+        return null;
     }
     validateSelection(appName, modelType, provider, model) {
         const models = this.getModels(appName, modelType, provider);

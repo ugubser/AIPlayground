@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generalChat = exports.chatRag = exports.embedChunks = void 0;
+exports.visionChat = exports.generalChat = exports.chatRag = exports.embedChunks = void 0;
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const node_fetch_1 = __importDefault(require("node-fetch"));
@@ -157,7 +157,7 @@ exports.embedChunks = functions
 exports.chatRag = functions
     .runWith({ timeoutSeconds: 60, memory: '1GB' })
     .https.onCall(async (data, context) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m;
     if (!context.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'Login required');
     }
@@ -165,10 +165,10 @@ exports.chatRag = functions
     // Use provided models from UI - these should always be provided by the frontend
     // Fallback to config defaults only if UI doesn't provide them
     const defaults = models_config_1.modelsConfigService.getDefaultSelection('rag');
-    const actualLlmProvider = llmProvider || (defaults === null || defaults === void 0 ? void 0 : defaults.llm.provider) || 'openrouter.ai';
-    const actualLlmModel = llmModel || (defaults === null || defaults === void 0 ? void 0 : defaults.llm.model) || 'openai/gpt-oss-20b:free';
-    const actualEmbedProvider = embedProvider || (defaults === null || defaults === void 0 ? void 0 : defaults.embed.provider) || 'together.ai';
-    const actualEmbedModel = embedModel || (defaults === null || defaults === void 0 ? void 0 : defaults.embed.model) || 'BAAI/bge-base-en-v1.5';
+    const actualLlmProvider = llmProvider || ((_a = defaults === null || defaults === void 0 ? void 0 : defaults.llm) === null || _a === void 0 ? void 0 : _a.provider) || 'openrouter.ai';
+    const actualLlmModel = llmModel || ((_b = defaults === null || defaults === void 0 ? void 0 : defaults.llm) === null || _b === void 0 ? void 0 : _b.model) || 'openai/gpt-oss-20b:free';
+    const actualEmbedProvider = embedProvider || ((_c = defaults === null || defaults === void 0 ? void 0 : defaults.embed) === null || _c === void 0 ? void 0 : _c.provider) || 'together.ai';
+    const actualEmbedModel = embedModel || ((_d = defaults === null || defaults === void 0 ? void 0 : defaults.embed) === null || _d === void 0 ? void 0 : _d.model) || 'BAAI/bge-base-en-v1.5';
     console.log('Received model parameters:', { llmProvider, llmModel, embedProvider, embedModel });
     console.log('Using models:', { actualLlmProvider, actualLlmModel, actualEmbedProvider, actualEmbedModel });
     if (!sessionId || !message) {
@@ -219,7 +219,7 @@ exports.chatRag = functions
             throw new functions.https.HttpsError('internal', 'Failed to embed query');
         }
         const embJson = await embResponse.json();
-        const queryVector = (_c = (_b = (_a = embJson.data) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.embedding) !== null && _c !== void 0 ? _c : [];
+        const queryVector = (_g = (_f = (_e = embJson.data) === null || _e === void 0 ? void 0 : _e[0]) === null || _f === void 0 ? void 0 : _f.embedding) !== null && _g !== void 0 ? _g : [];
         if (isEmulator) {
             console.log(`📤 ${actualEmbedProvider} Query Embedding Response:`, JSON.stringify({
                 status: embResponse.status,
@@ -335,7 +335,7 @@ exports.chatRag = functions
             throw new functions.https.HttpsError('internal', 'Failed to generate response');
         }
         const llmJson = await llmResponse.json();
-        const answer = (_g = (_f = (_e = (_d = llmJson.choices) === null || _d === void 0 ? void 0 : _d[0]) === null || _e === void 0 ? void 0 : _e.message) === null || _f === void 0 ? void 0 : _f.content) !== null && _g !== void 0 ? _g : 'Sorry, I could not generate a response.';
+        const answer = (_l = (_k = (_j = (_h = llmJson.choices) === null || _h === void 0 ? void 0 : _h[0]) === null || _j === void 0 ? void 0 : _j.message) === null || _k === void 0 ? void 0 : _k.content) !== null && _l !== void 0 ? _l : 'Sorry, I could not generate a response.';
         if (isEmulator) {
             console.log('📤 LLM Response:', JSON.stringify({
                 provider: actualLlmProvider,
@@ -346,7 +346,7 @@ exports.chatRag = functions
                     model: llmJson.model,
                     usage: llmJson.usage,
                     answerLength: answer.length,
-                    choicesCount: ((_h = llmJson.choices) === null || _h === void 0 ? void 0 : _h.length) || 0
+                    choicesCount: ((_m = llmJson.choices) === null || _m === void 0 ? void 0 : _m.length) || 0
                 }
             }, null, 2));
         }
@@ -375,16 +375,16 @@ exports.chatRag = functions
 exports.generalChat = functions
     .runWith({ timeoutSeconds: 60, memory: '1GB' })
     .https.onCall(async (data, context) => {
-    var _a, _b, _c, _d, _e;
+    var _a, _b, _c, _d, _e, _f, _g;
     if (!context.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'Login required');
     }
     const { message, llmProvider, llmModel } = data;
     // Use provided models from UI - these should always be provided by the frontend
     // Fallback to config defaults only if UI doesn't provide them
-    const defaults = models_config_1.modelsConfigService.getDefaultSelection('rag');
-    const actualLlmProvider = llmProvider || (defaults === null || defaults === void 0 ? void 0 : defaults.llm.provider) || 'openrouter.ai';
-    const actualLlmModel = llmModel || (defaults === null || defaults === void 0 ? void 0 : defaults.llm.model) || 'openai/gpt-oss-20b:free';
+    const defaults = models_config_1.modelsConfigService.getDefaultSelection('chat');
+    const actualLlmProvider = llmProvider || ((_a = defaults === null || defaults === void 0 ? void 0 : defaults.llm) === null || _a === void 0 ? void 0 : _a.provider) || 'openrouter.ai';
+    const actualLlmModel = llmModel || ((_b = defaults === null || defaults === void 0 ? void 0 : defaults.llm) === null || _b === void 0 ? void 0 : _b.model) || 'openai/gpt-oss-20b:free';
     console.log('General chat request:', { actualLlmProvider, actualLlmModel });
     if (!message) {
         throw new functions.https.HttpsError('invalid-argument', 'message required');
@@ -431,7 +431,7 @@ exports.generalChat = functions
             throw new functions.https.HttpsError('internal', 'Failed to generate response');
         }
         const llmJson = await llmResponse.json();
-        const answer = (_d = (_c = (_b = (_a = llmJson.choices) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.message) === null || _c === void 0 ? void 0 : _c.content) !== null && _d !== void 0 ? _d : 'Sorry, I could not generate a response.';
+        const answer = (_f = (_e = (_d = (_c = llmJson.choices) === null || _c === void 0 ? void 0 : _c[0]) === null || _d === void 0 ? void 0 : _d.message) === null || _e === void 0 ? void 0 : _e.content) !== null && _f !== void 0 ? _f : 'Sorry, I could not generate a response.';
         if (isEmulator) {
             console.log('📤 General Chat LLM Response:', JSON.stringify({
                 provider: actualLlmProvider,
@@ -442,7 +442,7 @@ exports.generalChat = functions
                     model: llmJson.model,
                     usage: llmJson.usage,
                     answerLength: answer.length,
-                    choicesCount: ((_e = llmJson.choices) === null || _e === void 0 ? void 0 : _e.length) || 0
+                    choicesCount: ((_g = llmJson.choices) === null || _g === void 0 ? void 0 : _g.length) || 0
                 }
             }, null, 2));
         }
@@ -455,6 +455,110 @@ exports.generalChat = functions
             throw error;
         }
         throw new functions.https.HttpsError('internal', 'Failed to process general chat request');
+    }
+});
+exports.visionChat = functions
+    .runWith({ timeoutSeconds: 60, memory: '1GB' })
+    .https.onCall(async (data, context) => {
+    var _a, _b, _c, _d, _e, _f, _g;
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'Login required');
+    }
+    const { message, imageData, visionProvider, visionModel } = data;
+    // Use provided models from UI - these should always be provided by the frontend
+    // Fallback to config defaults only if UI doesn't provide them
+    const defaults = models_config_1.modelsConfigService.getDefaultSelection('vision');
+    const actualVisionProvider = visionProvider || ((_a = defaults === null || defaults === void 0 ? void 0 : defaults.vision) === null || _a === void 0 ? void 0 : _a.provider) || 'openrouter.ai';
+    const actualVisionModel = visionModel || ((_b = defaults === null || defaults === void 0 ? void 0 : defaults.vision) === null || _b === void 0 ? void 0 : _b.model) || 'openai/gpt-4o';
+    console.log('Vision chat request:', { actualVisionProvider, actualVisionModel });
+    if (!message || !imageData) {
+        throw new functions.https.HttpsError('invalid-argument', 'message and imageData required');
+    }
+    try {
+        // Get Vision API key
+        const visionApiKeyEnvVar = models_config_1.modelsConfigService.getApiKeyEnvVar(actualVisionProvider);
+        const visionKey = process.env[visionApiKeyEnvVar];
+        if (!visionKey) {
+            console.error(`${visionApiKeyEnvVar} not found`);
+            throw new functions.https.HttpsError('internal', `${visionApiKeyEnvVar} not configured`);
+        }
+        const visionApiUrl = models_config_1.modelsConfigService.getProviderApiUrl(actualVisionProvider, 'VISION');
+        if (!visionApiUrl) {
+            throw new functions.https.HttpsError('internal', `No API URL configured for provider ${actualVisionProvider} and model type VISION`);
+        }
+        // Build the message content with image
+        const messageContent = [
+            {
+                type: 'text',
+                text: message
+            },
+            {
+                type: 'image_url',
+                image_url: {
+                    url: `data:image/jpeg;base64,${imageData}`
+                }
+            }
+        ];
+        const visionRequestBody = {
+            model: actualVisionModel,
+            messages: [
+                { role: 'user', content: messageContent }
+            ],
+            temperature: 0.7,
+            max_tokens: 2000
+        };
+        const visionHeaders = models_config_1.modelsConfigService.getProviderHeaders(actualVisionProvider, visionKey, 'vision');
+        if (isEmulator) {
+            console.log('🔍 Vision Chat Request:', JSON.stringify({
+                provider: actualVisionProvider,
+                model: actualVisionModel,
+                url: visionApiUrl,
+                method: 'POST',
+                headers: Object.assign({}, models_config_1.modelsConfigService.getProviderHeaders(actualVisionProvider, `${visionKey.substring(0, 10)}...`, 'vision')),
+                body: Object.assign(Object.assign({}, visionRequestBody), { messages: [{
+                            role: 'user',
+                            content: [
+                                { type: 'text', text: `${message.substring(0, 100)}...` },
+                                { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,[IMAGE_DATA]' } }
+                            ]
+                        }] })
+            }, null, 2));
+        }
+        const visionResponse = await (0, node_fetch_1.default)(visionApiUrl, {
+            method: 'POST',
+            headers: visionHeaders,
+            body: JSON.stringify(visionRequestBody)
+        });
+        if (!visionResponse.ok) {
+            const errorText = await visionResponse.text();
+            console.error('Vision API error:', visionResponse.status, errorText);
+            throw new functions.https.HttpsError('internal', 'Failed to analyze image');
+        }
+        const visionJson = await visionResponse.json();
+        const answer = (_f = (_e = (_d = (_c = visionJson.choices) === null || _c === void 0 ? void 0 : _c[0]) === null || _d === void 0 ? void 0 : _d.message) === null || _e === void 0 ? void 0 : _e.content) !== null && _f !== void 0 ? _f : 'Sorry, I could not analyze the image.';
+        if (isEmulator) {
+            console.log('📤 Vision Chat Response:', JSON.stringify({
+                provider: actualVisionProvider,
+                model: actualVisionModel,
+                status: visionResponse.status,
+                statusText: visionResponse.statusText,
+                data: {
+                    model: visionJson.model,
+                    usage: visionJson.usage,
+                    answerLength: answer.length,
+                    choicesCount: ((_g = visionJson.choices) === null || _g === void 0 ? void 0 : _g.length) || 0
+                }
+            }, null, 2));
+        }
+        console.log(`Successfully generated vision response`);
+        return { answer };
+    }
+    catch (error) {
+        console.error('Error in visionChat:', error);
+        if (error instanceof functions.https.HttpsError) {
+            throw error;
+        }
+        throw new functions.https.HttpsError('internal', 'Failed to process vision request');
     }
 });
 //# sourceMappingURL=index.js.map

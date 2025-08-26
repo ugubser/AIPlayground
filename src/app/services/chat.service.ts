@@ -47,6 +47,11 @@ export class ChatService {
     message: string;
   }, { answer: string }>(this.functions, 'generalChat');
 
+  private visionChat = httpsCallable<{
+    message: string;
+    imageData: string;
+  }, { answer: string }>(this.functions, 'visionChat');
+
   constructor(
     private firestore: Firestore,
     private functions: Functions,
@@ -232,5 +237,64 @@ export class ChatService {
         createdAt: new Date()
       };
     }
+  }
+
+  async sendVisionMessage(imageFile: File, prompt: string, modelSelection?: DynamicModelSelection): Promise<ChatMessage> {
+    if (!this.auth.currentUser) {
+      throw new Error('User not authenticated');
+    }
+
+    try {
+      // Convert image file to base64
+      const imageData = await this.fileToBase64(imageFile);
+
+      const visionRequest: any = {
+        message: prompt,
+        imageData
+      };
+
+      // Add model selection if provided
+      if (modelSelection && modelSelection['vision']) {
+        visionRequest.visionProvider = modelSelection['vision'].provider;
+        visionRequest.visionModel = modelSelection['vision'].model;
+        console.log('Chat service sending vision request with models:', {
+          visionProvider: visionRequest.visionProvider,
+          visionModel: visionRequest.visionModel
+        });
+      } else {
+        console.log('Chat service: No model selection provided for vision, using defaults');
+      }
+
+      const { data } = await this.visionChat(visionRequest);
+
+      return {
+        role: 'assistant',
+        content: data.answer,
+        createdAt: new Date()
+      };
+
+    } catch (error) {
+      console.error('Error getting vision response:', error);
+      
+      return {
+        role: 'assistant',
+        content: 'Sorry, I encountered an error analyzing your image. Please try again.',
+        createdAt: new Date()
+      };
+    }
+  }
+
+  private fileToBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        // Remove the data:image/...;base64, prefix
+        const base64Data = result.split(',')[1];
+        resolve(base64Data);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
   }
 }

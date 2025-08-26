@@ -46,6 +46,10 @@
   "vision": {
     "VISION": {
       "openrouter.ai": [
+        "google/gemini-2.5-flash-image-preview:free",
+        "moonshotai/kimi-vl-a3b-thinking:free",
+        "meta-llama/llama-4-maverick:free",
+        "google/gemma-3-4b-it:free",
         "openai/gpt-4o",
         "anthropic/claude-3.5-sonnet",
         "google/gemini-2.0-flash-exp",

@@ -163,11 +163,11 @@ export const chatRag = functions
 
     // Use provided models from UI - these should always be provided by the frontend
     // Fallback to config defaults only if UI doesn't provide them
-    const defaults = modelsConfigService.getDefaultSelection('rag');
-    const actualLlmProvider = llmProvider || defaults?.llm.provider || 'openrouter.ai';
-    const actualLlmModel = llmModel || defaults?.llm.model || 'openai/gpt-oss-20b:free';
-    const actualEmbedProvider = embedProvider || defaults?.embed.provider || 'together.ai';
-    const actualEmbedModel = embedModel || defaults?.embed.model || 'BAAI/bge-base-en-v1.5';
+    const defaults = modelsConfigService.getDefaultSelection('rag') as any;
+    const actualLlmProvider = llmProvider || defaults?.llm?.provider || 'openrouter.ai';
+    const actualLlmModel = llmModel || defaults?.llm?.model || 'openai/gpt-oss-20b:free';
+    const actualEmbedProvider = embedProvider || defaults?.embed?.provider || 'together.ai';
+    const actualEmbedModel = embedModel || defaults?.embed?.model || 'BAAI/bge-base-en-v1.5';
 
     console.log('Received model parameters:', { llmProvider, llmModel, embedProvider, embedModel });
     console.log('Using models:', { actualLlmProvider, actualLlmModel, actualEmbedProvider, actualEmbedModel });
@@ -429,9 +429,9 @@ export const generalChat = functions
 
     // Use provided models from UI - these should always be provided by the frontend
     // Fallback to config defaults only if UI doesn't provide them
-    const defaults = modelsConfigService.getDefaultSelection('rag');
-    const actualLlmProvider = llmProvider || defaults?.llm.provider || 'openrouter.ai';
-    const actualLlmModel = llmModel || defaults?.llm.model || 'openai/gpt-oss-20b:free';
+    const defaults = modelsConfigService.getDefaultSelection('chat') as any;
+    const actualLlmProvider = llmProvider || defaults?.llm?.provider || 'openrouter.ai';
+    const actualLlmModel = llmModel || defaults?.llm?.model || 'openai/gpt-oss-20b:free';
 
     console.log('General chat request:', { actualLlmProvider, actualLlmModel });
 
@@ -520,5 +520,130 @@ export const generalChat = functions
         throw error;
       }
       throw new functions.https.HttpsError('internal', 'Failed to process general chat request');
+    }
+  });
+
+export const visionChat = functions
+  .runWith({ timeoutSeconds: 60, memory: '1GB' })
+  .https.onCall(async (data, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError('unauthenticated', 'Login required');
+    }
+
+    const { message, imageData, visionProvider, visionModel } = data;
+
+    // Use provided models from UI - these should always be provided by the frontend
+    // Fallback to config defaults only if UI doesn't provide them
+    const defaults = modelsConfigService.getDefaultSelection('vision') as any;
+    const actualVisionProvider = visionProvider || defaults?.vision?.provider || 'openrouter.ai';
+    const actualVisionModel = visionModel || defaults?.vision?.model || 'openai/gpt-4o';
+
+    console.log('Vision chat request:', { actualVisionProvider, actualVisionModel });
+
+    if (!message || !imageData) {
+      throw new functions.https.HttpsError('invalid-argument', 'message and imageData required');
+    }
+
+    try {
+      // Get Vision API key
+      const visionApiKeyEnvVar = modelsConfigService.getApiKeyEnvVar(actualVisionProvider);
+      const visionKey = process.env[visionApiKeyEnvVar];
+      if (!visionKey) {
+        console.error(`${visionApiKeyEnvVar} not found`);
+        throw new functions.https.HttpsError('internal', `${visionApiKeyEnvVar} not configured`);
+      }
+
+      const visionApiUrl = modelsConfigService.getProviderApiUrl(actualVisionProvider, 'VISION');
+      if (!visionApiUrl) {
+        throw new functions.https.HttpsError('internal', `No API URL configured for provider ${actualVisionProvider} and model type VISION`);
+      }
+
+      // Build the message content with image
+      const messageContent = [
+        {
+          type: 'text',
+          text: message
+        },
+        {
+          type: 'image_url',
+          image_url: {
+            url: `data:image/jpeg;base64,${imageData}`
+          }
+        }
+      ];
+
+      const visionRequestBody = {
+        model: actualVisionModel,
+        messages: [
+          { role: 'user', content: messageContent }
+        ],
+        temperature: 0.7,
+        max_tokens: 2000
+      };
+
+      const visionHeaders = modelsConfigService.getProviderHeaders(actualVisionProvider, visionKey, 'vision');
+
+      if (isEmulator) {
+        console.log('🔍 Vision Chat Request:', JSON.stringify({
+          provider: actualVisionProvider,
+          model: actualVisionModel,
+          url: visionApiUrl,
+          method: 'POST',
+          headers: {
+            ...modelsConfigService.getProviderHeaders(actualVisionProvider, `${visionKey.substring(0, 10)}...`, 'vision')
+          },
+          body: {
+            ...visionRequestBody,
+            messages: [{
+              role: 'user',
+              content: [
+                { type: 'text', text: `${message.substring(0, 100)}...` },
+                { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,[IMAGE_DATA]' } }
+              ]
+            }]
+          }
+        }, null, 2));
+      }
+
+      const visionResponse = await fetch(visionApiUrl, {
+        method: 'POST',
+        headers: visionHeaders,
+        body: JSON.stringify(visionRequestBody)
+      });
+
+      if (!visionResponse.ok) {
+        const errorText = await visionResponse.text();
+        console.error('Vision API error:', visionResponse.status, errorText);
+        throw new functions.https.HttpsError('internal', 'Failed to analyze image');
+      }
+
+      const visionJson = await visionResponse.json() as any;
+      const answer = visionJson.choices?.[0]?.message?.content ?? 'Sorry, I could not analyze the image.';
+
+      if (isEmulator) {
+        console.log('📤 Vision Chat Response:', JSON.stringify({
+          provider: actualVisionProvider,
+          model: actualVisionModel,
+          status: visionResponse.status,
+          statusText: visionResponse.statusText,
+          data: {
+            model: visionJson.model,
+            usage: visionJson.usage,
+            answerLength: answer.length,
+            choicesCount: visionJson.choices?.length || 0
+          }
+        }, null, 2));
+      }
+
+      console.log(`Successfully generated vision response`);
+
+      return { answer };
+
+    } catch (error) {
+      console.error('Error in visionChat:', error);
+      if (error instanceof functions.https.HttpsError) {
+        throw error;
+      }
+      throw new functions.https.HttpsError('internal', 'Failed to process vision request');
     }
   });

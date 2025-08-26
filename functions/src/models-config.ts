@@ -18,6 +18,12 @@ export interface RAGModelSelection {
   embed: ModelSelection;
 }
 
+export interface VisionModelSelection {
+  vision: ModelSelection;
+}
+
+export type AppModelSelection = RAGModelSelection | VisionModelSelection;
+
 export class ModelsConfigService {
   private config: ModelConfig = modelsConfig;
 
@@ -41,20 +47,40 @@ export class ModelsConfigService {
     return app[modelType][provider];
   }
 
-  getDefaultSelection(appName: string): RAGModelSelection | null {
-    if (appName !== 'rag') return null;
+  getDefaultSelection(appName: string): AppModelSelection | null {
+    if (appName === 'rag') {
+      // These should only be used as absolute fallbacks when UI doesn't provide models
+      return {
+        llm: {
+          provider: 'openrouter.ai',
+          model: 'openai/gpt-oss-20b:free'
+        },
+        embed: {
+          provider: 'together.ai',
+          model: 'BAAI/bge-base-en-v1.5'
+        }
+      } as RAGModelSelection;
+    } else if (appName === 'vision') {
+      return {
+        vision: {
+          provider: 'openrouter.ai',
+          model: 'openai/gpt-4o'
+        }
+      } as VisionModelSelection;
+    } else if (appName === 'chat') {
+      return {
+        llm: {
+          provider: 'openrouter.ai',
+          model: 'openai/gpt-oss-20b:free'
+        },
+        embed: {
+          provider: 'together.ai',
+          model: 'BAAI/bge-base-en-v1.5'
+        }
+      } as RAGModelSelection;
+    }
 
-    // These should only be used as absolute fallbacks when UI doesn't provide models
-    return {
-      llm: {
-        provider: 'openrouter.ai',
-        model: 'openai/gpt-oss-20b:free'
-      },
-      embed: {
-        provider: 'together.ai',
-        model: 'BAAI/bge-base-en-v1.5'
-      }
-    };
+    return null;
   }
 
   validateSelection(appName: string, modelType: string, provider: string, model: string): boolean {

@@ -13,6 +13,12 @@
       (click)="setActiveTab('chat')">
       💬 Chat
     </button>
+    <button 
+      class="tab-btn" 
+      [class.active]="activeTab === 'vision'"
+      (click)="setActiveTab('vision')">
+      👁️ Vision
+    </button>
   </nav>
 
   <!-- RAG Tab -->
@@ -248,6 +254,112 @@
               <span *ngIf="!sendingGeneral">➤</span>
               <span *ngIf="sendingGeneral" class="sending-icon">⏳</span>
             </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Vision Tab -->
+  <div class="tab-content" *ngIf="activeTab === 'vision'">
+    <div class="vision-container">
+      <div class="vision-header">
+        <h3>👁️ Vision Analysis</h3>
+        <p>Upload an image and let AI analyze it for you!</p>
+      </div>
+
+      <div class="vision-content">
+        <!-- Image Upload Section -->
+        <div class="vision-upload-section">
+          <div class="image-upload-area" 
+               [class.drag-over]="visionDragOver"
+               [class.uploading]="visionUploading"
+               [class.has-image]="selectedImage"
+               (dragover)="onVisionDragOver($event)"
+               (dragleave)="onVisionDragLeave($event)"
+               (drop)="onVisionDrop($event)">
+            
+            <div class="upload-content" *ngIf="!selectedImage && !visionUploading">
+              <div class="upload-icon">🖼️</div>
+              <h4>Upload Image</h4>
+              <p>Drag & drop or click to select</p>
+              <p class="supported-formats">Supports: JPG, PNG, GIF, WebP</p>
+              <input 
+                type="file" 
+                accept="image/*" 
+                (change)="onImageSelect($event)"
+                #imageInput
+                style="display: none">
+              <button class="btn btn-primary btn-small" (click)="imageInput.click()">
+                Choose Image
+              </button>
+            </div>
+
+            <div class="image-preview" *ngIf="selectedImage && !visionUploading">
+              <img [src]="selectedImage.url" [alt]="selectedImage.name" class="preview-image">
+              <div class="image-info">
+                <div class="image-name">{{ selectedImage.name }}</div>
+                <div class="image-size">{{ formatFileSize(selectedImage.size) }}</div>
+              </div>
+              <button class="btn btn-small btn-secondary" (click)="clearSelectedImage()">
+                Remove
+              </button>
+            </div>
+
+            <div class="upload-progress" *ngIf="visionUploading">
+              <div class="spinner"></div>
+              <p>Processing image...</p>
+            </div>
+          </div>
+
+          <div class="vision-input-area" *ngIf="selectedImage && !visionUploading">
+            <textarea 
+              class="vision-prompt-input"
+              [(ngModel)]="visionPrompt"
+              placeholder="What would you like to know about this image? (Optional - leave blank for general analysis)"
+              rows="3"></textarea>
+            <button 
+              class="btn btn-primary"
+              (click)="analyzeImage()"
+              [disabled]="sendingVision || !selectedImage">
+              <span *ngIf="!sendingVision">Analyze Image</span>
+              <span *ngIf="sendingVision">Analyzing...</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Vision Results Section -->
+        <div class="vision-results" *ngIf="visionMessages.length > 0">
+          <h4>Analysis Results</h4>
+          <div class="vision-messages">
+            <div 
+              class="vision-message"
+              *ngFor="let message of visionMessages; let i = index"
+              [class.user-message]="message.role === 'user'"
+              [class.assistant-message]="message.role === 'assistant'">
+              
+              <div class="message-content">
+                <div class="message-image" *ngIf="message.image">
+                  <img [src]="message.image.url" [alt]="message.image.name" class="message-image-preview">
+                </div>
+                <div class="message-text" *ngIf="message.content">{{ message.content }}</div>
+                <div class="message-prompt" *ngIf="message.prompt">
+                  <strong>Prompt:</strong> {{ message.prompt }}
+                </div>
+              </div>
+              
+              <div class="message-time">
+                {{ message.createdAt.toLocaleTimeString() }}
+              </div>
+            </div>
+
+            <div class="vision-message assistant-message" *ngIf="sendingVision">
+              <div class="message-content">
+                <div class="typing-indicator">
+                  <span></span><span></span><span></span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

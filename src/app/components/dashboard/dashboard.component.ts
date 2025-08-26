@@ -9,6 +9,14 @@ import { AuthService } from '../../services/auth.service';
 import { GlobalModelSelectionService } from '../../services/global-model-selection.service';
 import { DynamicModelSelection } from '../../services/models-config.service';
 
+interface VisionMessage {
+  role: 'user' | 'assistant';
+  content?: string;
+  image?: { url: string; name: string };
+  prompt?: string;
+  createdAt: Date;
+}
+
 @Component({
   selector: 'app-dashboard',
   standalone: true,
@@ -36,8 +44,16 @@ export class DashboardComponent implements OnInit {
   sendingGeneral = false;
 
   // UI State
-  activeTab: 'rag' | 'chat' = 'rag';
+  activeTab: 'rag' | 'chat' | 'vision' = 'rag';
   dragOver = false;
+
+  // Vision functionality
+  selectedImage: { url: string; name: string; size: number; file: File } | null = null;
+  visionDragOver = false;
+  visionUploading = false;
+  visionPrompt = '';
+  sendingVision = false;
+  visionMessages: VisionMessage[] = [];
 
   constructor(
     private pdfProcessor: PdfProcessorService,
@@ -261,11 +277,127 @@ export class DashboardComponent implements OnInit {
     }
   }
 
-  setActiveTab(tab: 'rag' | 'chat') {
+  setActiveTab(tab: 'rag' | 'chat' | 'vision') {
     this.activeTab = tab;
     
     // Update global app context for model selector
-    const appName = tab === 'chat' ? 'chat' : 'rag';
+    let appName = 'rag';
+    if (tab === 'chat') appName = 'chat';
+    else if (tab === 'vision') appName = 'vision';
+    
     this.globalModelSelection.updateCurrentApp(appName);
+  }
+
+  // Vision functionality methods
+  onVisionDragOver(event: DragEvent) {
+    event.preventDefault();
+    this.visionDragOver = true;
+  }
+
+  onVisionDragLeave(event: DragEvent) {
+    event.preventDefault();
+    this.visionDragOver = false;
+  }
+
+  onVisionDrop(event: DragEvent) {
+    event.preventDefault();
+    this.visionDragOver = false;
+    
+    const files = event.dataTransfer?.files;
+    if (files && files.length > 0) {
+      this.handleImageFile(files[0]);
+    }
+  }
+
+  onImageSelect(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files.length > 0) {
+      this.handleImageFile(input.files[0]);
+    }
+  }
+
+  handleImageFile(file: File) {
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file.');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) { // 10MB limit
+      alert('Image size must be less than 10MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      this.selectedImage = {
+        url: e.target?.result as string,
+        name: file.name,
+        size: file.size,
+        file: file
+      };
+    };
+    reader.readAsDataURL(file);
+  }
+
+  clearSelectedImage() {
+    this.selectedImage = null;
+    this.visionPrompt = '';
+  }
+
+  formatFileSize(bytes: number): string {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  async analyzeImage() {
+    if (!this.selectedImage || this.sendingVision) {
+      return;
+    }
+
+    this.sendingVision = true;
+    const prompt = this.visionPrompt.trim() || 'Please analyze this image and describe what you see.';
+
+    // Add user message
+    const userMessage: VisionMessage = {
+      role: 'user',
+      image: { url: this.selectedImage.url, name: this.selectedImage.name },
+      prompt: prompt,
+      createdAt: new Date()
+    };
+    this.visionMessages.push(userMessage);
+
+    try {
+      // Use the chat service to send vision message
+      const response = await this.chatService.sendVisionMessage(
+        this.selectedImage.file,
+        prompt,
+        this.globalModelSelection.getSelectionForRequest()
+      );
+      
+      // Add assistant response
+      const assistantMessage: VisionMessage = {
+        role: 'assistant',
+        content: response.content,
+        createdAt: new Date()
+      };
+      this.visionMessages.push(assistantMessage);
+      
+      // Clear the prompt for next use
+      this.visionPrompt = '';
+      
+    } catch (error) {
+      console.error('Error analyzing image:', error);
+      // Add error message
+      this.visionMessages.push({
+        role: 'assistant',
+        content: 'Sorry, there was an error analyzing your image. Please try again.',
+        createdAt: new Date()
+      });
+    } finally {
+      this.sendingVision = false;
+    }
   }
 }
