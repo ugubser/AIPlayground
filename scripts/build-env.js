@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
@@ -7,55 +5,29 @@ require('dotenv').config();
 function createEnvironmentFile(templatePath, outputPath) {
   if (!fs.existsSync(templatePath)) {
     console.error(`Template file not found: ${templatePath}`);
-    process.exit(1);
+    return;
   }
 
   let template = fs.readFileSync(templatePath, 'utf8');
   
-  // Replace environment variables
-  const requiredVars = [
-    'FIREBASE_API_KEY',
-    'FIREBASE_AUTH_DOMAIN', 
-    'FIREBASE_PROJECT_ID',
-    'FIREBASE_STORAGE_BUCKET',
-    'FIREBASE_MESSAGING_SENDER_ID',
-    'FIREBASE_APP_ID',
-    'FIREBASE_MEASUREMENT_ID'
-  ];
-
-  for (const varName of requiredVars) {
+  // Replace all ${VARIABLE_NAME} with actual environment variables
+  template = template.replace(/\$\{([^}]+)\}/g, (match, varName) => {
     const value = process.env[varName];
-    if (!value) {
-      console.error(`Missing required environment variable: ${varName}`);
-      process.exit(1);
+    if (value === undefined) {
+      console.warn(`Warning: Environment variable ${varName} not found`);
+      return match; // Keep the placeholder if variable not found
     }
-    template = template.replace(new RegExp(`\\$\\{${varName}\\}`, 'g'), value);
-  }
-
-  // Ensure output directory exists
-  const outputDir = path.dirname(outputPath);
-  if (!fs.existsSync(outputDir)) {
-    fs.mkdirSync(outputDir, { recursive: true });
-  }
+    return value;
+  });
 
   fs.writeFileSync(outputPath, template);
-  console.log(`Created environment file: ${outputPath}`);
+  console.log(`Generated: ${outputPath}`);
 }
 
 const buildType = process.argv[2] || 'development';
 
 if (buildType === 'production') {
-  // For production builds, create production environment
-  createEnvironmentFile(
-    'src/environments/environment.prod.template.ts',
-    'src/environments/environment.prod.ts'
-  );
-  console.log('Production environment file generated successfully!');
+  createEnvironmentFile('src/environments/environment.prod.template.ts', 'src/environments/environment.prod.ts');
 } else {
-  // For development builds, create development environment
-  createEnvironmentFile(
-    'src/environments/environment.template.ts',
-    'src/environments/environment.ts'
-  );
-  console.log('Development environment file generated successfully!');
+  createEnvironmentFile('src/environments/environment.template.ts', 'src/environments/environment.ts');
 }

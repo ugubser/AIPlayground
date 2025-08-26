@@ -6,11 +6,11 @@
     "prebuild": "node scripts/build-env.js development",
     "prebuild:prod": "node scripts/build-env.js production",
     "start": "ng serve --port 4200",
-    "build": "ng build",
+    "build": "npm run prebuild && ng build --configuration development",
     "build:prod": "npm run prebuild:prod && ng build --configuration production",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "emulators": "npm run prebuild && firebase emulators:start",
+    "emulators": "firebase emulators:start",
     "emulators:hosting": "npm run build && firebase emulators:start",
     "build:functions": "cd functions && npm run build",
     "deploy": "npm run build:prod && npm run build:functions && firebase deploy"

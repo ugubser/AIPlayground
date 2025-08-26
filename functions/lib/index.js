@@ -6,6 +6,7 @@ const admin = require("firebase-admin");
 const node_fetch_1 = require("node-fetch");
 admin.initializeApp();
 const db = admin.firestore();
+const isEmulator = process.env.FUNCTIONS_EMULATOR === 'true';
 const TOGETHER_URL = 'https://api.together.xyz/v1/embeddings';
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 function cosine(a, b) {
@@ -26,6 +27,7 @@ function cosine(a, b) {
 exports.embedChunks = functions
     .runWith({ timeoutSeconds: 540, memory: '2GB' })
     .https.onCall(async (data, context) => {
+    var _a;
     if (!context.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'Login required');
     }
@@ -44,16 +46,28 @@ exports.embedChunks = functions
     console.log('TOGETHER_API_KEY found:', !!key);
     try {
         console.log(`Processing ${texts.length} texts for embeddings`);
+        const requestBody = {
+            model: 'BAAI/bge-base-en-v1.5-vllm',
+            input: texts
+        };
+        if (isEmulator) {
+            console.log('🔍 Together.ai Request:', JSON.stringify({
+                url: TOGETHER_URL,
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${key.substring(0, 10)}...`,
+                    'Content-Type': 'application/json'
+                },
+                body: requestBody
+            }, null, 2));
+        }
         const response = await (0, node_fetch_1.default)(TOGETHER_URL, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${key}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                model: 'BAAI/bge-base-en-v1.5-vllm',
-                input: texts
-            })
+            body: JSON.stringify(requestBody)
         });
         if (!response.ok) {
             const errorText = await response.text();
@@ -68,6 +82,18 @@ exports.embedChunks = functions
         }
         const json = await response.json();
         const vectors = (json.data || []).map((d) => d.embedding);
+        if (isEmulator) {
+            console.log('📤 Together.ai Response:', JSON.stringify({
+                status: response.status,
+                statusText: response.statusText,
+                data: {
+                    model: json.model,
+                    usage: json.usage,
+                    vectorCount: vectors.length,
+                    firstVectorLength: ((_a = vectors[0]) === null || _a === void 0 ? void 0 : _a.length) || 0
+                }
+            }, null, 2));
+        }
         if (vectors.length !== texts.length) {
             throw new functions.https.HttpsError('internal', 'Mismatch between input and output lengths');
         }
@@ -85,7 +111,7 @@ exports.embedChunks = functions
 exports.chatRag = functions
     .runWith({ timeoutSeconds: 60, memory: '1GB' })
     .https.onCall(async (data, context) => {
-    var _a, _b, _c, _d, _e, _f, _g;
+    var _a, _b, _c, _d, _e, _f, _g, _h;
     if (!context.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'Login required');
     }
@@ -102,22 +128,45 @@ exports.chatRag = functions
             console.error('TOGETHER_API_KEY not found for chat');
             throw new functions.https.HttpsError('internal', 'TOGETHER_API_KEY not configured');
         }
+        const queryRequestBody = {
+            model: 'BAAI/bge-base-en-v1.5-vllm',
+            input: [message]
+        };
+        if (isEmulator) {
+            console.log('🔍 Together.ai Query Embedding Request:', JSON.stringify({
+                url: TOGETHER_URL,
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${togetherKey.substring(0, 10)}...`,
+                    'Content-Type': 'application/json'
+                },
+                body: queryRequestBody
+            }, null, 2));
+        }
         const embResponse = await (0, node_fetch_1.default)(TOGETHER_URL, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${togetherKey}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                model: 'BAAI/bge-base-en-v1.5-vllm',
-                input: [message]
-            })
+            body: JSON.stringify(queryRequestBody)
         });
         if (!embResponse.ok) {
             throw new functions.https.HttpsError('internal', 'Failed to embed query');
         }
         const embJson = await embResponse.json();
         const queryVector = (_c = (_b = (_a = embJson.data) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.embedding) !== null && _c !== void 0 ? _c : [];
+        if (isEmulator) {
+            console.log('📤 Together.ai Query Embedding Response:', JSON.stringify({
+                status: embResponse.status,
+                statusText: embResponse.statusText,
+                data: {
+                    model: embJson.model,
+                    usage: embJson.usage,
+                    embeddingLength: queryVector.length
+                }
+            }, null, 2));
+        }
         if (queryVector.length === 0) {
             throw new functions.https.HttpsError('internal', 'Empty query embedding');
         }
@@ -183,6 +232,31 @@ exports.chatRag = functions
             console.error('OPENROUTER_API_KEY not found');
             throw new functions.https.HttpsError('internal', 'OPENROUTER_API_KEY not configured');
         }
+        const llmRequestBody = {
+            model: 'meta-llama/llama-3.1-70b-instruct',
+            messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userPrompt }
+            ],
+            temperature: 0.2,
+            max_tokens: 1000
+        };
+        if (isEmulator) {
+            console.log('🔍 OpenRouter Request:', JSON.stringify({
+                url: OPENROUTER_URL,
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${openrouterKey.substring(0, 10)}...`,
+                    'Content-Type': 'application/json',
+                    'HTTP-Referer': 'https://aiplayground-6e5be.web.app',
+                    'X-Title': 'Firebase RAG Chatbot'
+                },
+                body: Object.assign(Object.assign({}, llmRequestBody), { messages: [
+                        { role: 'system', content: `${systemPrompt.substring(0, 100)}...` },
+                        { role: 'user', content: `${userPrompt.substring(0, 200)}...` }
+                    ] })
+            }, null, 2));
+        }
         const llmResponse = await (0, node_fetch_1.default)(OPENROUTER_URL, {
             method: 'POST',
             headers: {
@@ -191,15 +265,7 @@ exports.chatRag = functions
                 'HTTP-Referer': 'https://aiplayground-6e5be.web.app',
                 'X-Title': 'Firebase RAG Chatbot'
             },
-            body: JSON.stringify({
-                model: 'meta-llama/llama-3.1-70b-instruct',
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: userPrompt }
-                ],
-                temperature: 0.2,
-                max_tokens: 1000
-            })
+            body: JSON.stringify(llmRequestBody)
         });
         if (!llmResponse.ok) {
             const errorText = await llmResponse.text();
@@ -208,8 +274,20 @@ exports.chatRag = functions
         }
         const llmJson = await llmResponse.json();
         const answer = (_g = (_f = (_e = (_d = llmJson.choices) === null || _d === void 0 ? void 0 : _d[0]) === null || _e === void 0 ? void 0 : _e.message) === null || _f === void 0 ? void 0 : _f.content) !== null && _g !== void 0 ? _g : 'Sorry, I could not generate a response.';
+        if (isEmulator) {
+            console.log('📤 OpenRouter Response:', JSON.stringify({
+                status: llmResponse.status,
+                statusText: llmResponse.statusText,
+                data: {
+                    model: llmJson.model,
+                    usage: llmJson.usage,
+                    answerLength: answer.length,
+                    choicesCount: ((_h = llmJson.choices) === null || _h === void 0 ? void 0 : _h.length) || 0
+                }
+            }, null, 2));
+        }
         // 5) Prepare sources for frontend
-        const sources = scoredChunks.map((item, index) => ({
+        const sources = scoredChunks.map((item) => ({
             docId: item.chunk.docId,
             chunkId: item.chunk.id,
             page: item.chunk.page,
