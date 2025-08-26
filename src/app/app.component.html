@@ -1,26 +1,49 @@
 <div class="app-container">
   <header class="app-header">
-    <h1>🤖 {{ title }}</h1>
-    
-    <!-- Global Model Configuration -->
-    <div class="model-config-section" *ngIf="user$ | async">
-      <app-model-selector 
-        [appName]="currentAppName"
-        [showCurrentSelection]="false"
-        (selectionChange)="onGlobalModelSelectionChange($event)">
-      </app-model-selector>
-    </div>
-
-    <div class="auth-section" *ngIf="user$ | async as user; else signInButton">
-      <span class="user-info">Signed in</span>
-      <button class="btn btn-secondary" (click)="signOut()">Sign Out</button>
-    </div>
-    <ng-template #signInButton>
-      <div class="auth-section">
-        <span *ngIf="loading" class="loading">Signing in...</span>
-        <button *ngIf="!loading" class="btn btn-primary" (click)="signInAnonymously()">Sign In</button>
+    <div class="header-content">
+      <div class="header-brand">
+        <div class="brand-icon">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="32" height="32" rx="8" fill="currentColor" opacity="0.1"/>
+            <path d="M8 12h16M8 16h16M8 20h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="20" cy="20" r="3" stroke="currentColor" stroke-width="2" fill="none"/>
+          </svg>
+        </div>
+        <h1 class="brand-title">{{ title }}</h1>
       </div>
-    </ng-template>
+      
+      <!-- Global Model Configuration -->
+      <div class="header-controls" *ngIf="user$ | async">
+        <div class="model-config-wrapper">
+          <app-model-selector 
+            [appName]="currentAppName"
+            [showCurrentSelection]="false"
+            (selectionChange)="onGlobalModelSelectionChange($event)">
+          </app-model-selector>
+        </div>
+      </div>
+
+      <div class="header-auth">
+        <div class="auth-section" *ngIf="user$ | async as user; else signInButton">
+          <div class="user-status">
+            <div class="status-indicator"></div>
+            <span class="user-info">Connected</span>
+          </div>
+          <button class="btn btn-ghost" (click)="signOut()">Sign Out</button>
+        </div>
+        <ng-template #signInButton>
+          <div class="auth-section">
+            <div *ngIf="loading" class="loading-state">
+              <div class="loading-spinner"></div>
+              <span class="loading-text">Connecting...</span>
+            </div>
+            <button *ngIf="!loading" class="btn btn-primary" (click)="signInAnonymously()">
+              Get Started
+            </button>
+          </div>
+        </ng-template>
+      </div>
+    </div>
   </header>
 
   <main class="main-content" *ngIf="user$ | async; else authRequired">
@@ -29,11 +52,28 @@
 
   <ng-template #authRequired>
     <div class="auth-required">
-      <h2>Please sign in to continue</h2>
-      <p>You need to be authenticated to use the chatbot.</p>
-      <button class="btn btn-primary" (click)="signInAnonymously()" [disabled]="loading">
-        {{ loading ? 'Signing in...' : 'Sign In Anonymously' }}
-      </button>
+      <div class="auth-hero">
+        <div class="hero-icon">
+          <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="64" height="64" rx="16" fill="var(--color-primary)" opacity="0.1"/>
+            <path d="M20 28h24M20 32h24M20 36h16" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="40" cy="36" r="6" stroke="var(--color-primary)" stroke-width="2" fill="none"/>
+            <circle cx="40" cy="36" r="2" fill="var(--color-primary)"/>
+          </svg>
+        </div>
+        <h2 class="hero-title">Welcome to AI Playground</h2>
+        <p class="hero-description">
+          Start exploring the power of AI with intelligent document analysis and conversational AI capabilities. 
+          Connect to begin your journey.
+        </p>
+        <button class="btn btn-primary btn-lg" (click)="signInAnonymously()" [disabled]="loading">
+          <span *ngIf="!loading">Get Started</span>
+          <span *ngIf="loading" class="loading-content">
+            <div class="loading-spinner"></div>
+            Connecting...
+          </span>
+        </button>
+      </div>
     </div>
   </ng-template>
 </div>

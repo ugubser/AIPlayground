@@ -42,70 +42,184 @@ import { ModelsConfigService, RAGModelSelection } from '../../services/models-co
   `,
   styles: [`
     .model-selector {
-      background: rgba(255, 255, 255, 0.1);
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-4) var(--space-5);
+      box-shadow: var(--shadow-sm);
       backdrop-filter: blur(10px);
-      border-radius: 6px;
-      padding: 8px 12px;
-      margin: 0;
-      font-size: 12px;
+      transition: all var(--transition-fast);
+    }
+
+    .model-selector:hover {
+      border-color: var(--color-primary);
+      box-shadow: var(--shadow-md);
     }
 
     .compact-row {
       display: flex;
       align-items: center;
-      gap: 16px;
-      flex-wrap: nowrap;
+      gap: var(--space-4);
+      flex-wrap: wrap;
     }
 
     .model-group-compact {
       display: flex;
       align-items: center;
-      gap: 6px;
-      white-space: nowrap;
+      gap: var(--space-2);
+      flex: 1;
+      min-width: 200px;
     }
 
     .model-group-compact label {
-      font-size: 11px;
-      font-weight: 500;
-      color: rgba(255, 255, 255, 0.9);
-      min-width: auto;
+      font-size: 0.75rem;
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      min-width: 40px;
+      flex-shrink: 0;
     }
 
     select {
-      padding: 4px 6px;
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      border-radius: 3px;
-      font-size: 11px;
-      background: rgba(255, 255, 255, 0.1);
-      color: white;
-      min-width: 80px;
-      max-width: 120px;
+      flex: 1;
+      padding: var(--space-2) var(--space-3);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      font-size: 0.8125rem;
+      font-family: var(--font-family-primary);
+      background: var(--color-surface-elevated);
+      color: var(--color-text-primary);
+      min-width: 120px;
+      transition: all var(--transition-fast);
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23b3b3b3' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+      background-position: right var(--space-2) center;
+      background-repeat: no-repeat;
+      background-size: 1rem;
+      padding-right: var(--space-8);
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
     }
 
     select option {
-      background: #333;
-      color: white;
+      background: var(--color-surface-elevated);
+      color: var(--color-text-primary);
+      padding: var(--space-2);
+      border: none;
+    }
+    
+    /* Ensure dropdown options have proper contrast in all browsers */
+    select option:checked {
+      background: var(--color-primary);
+      color: var(--color-white);
+    }
+    
+    select option:hover {
+      background: var(--color-surface-hover);
+      color: var(--color-text-primary);
     }
 
     select:focus {
       outline: none;
-      border-color: rgba(255, 255, 255, 0.6);
-      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2);
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.3);
+      background: var(--color-surface-elevated);
+    }
+
+    select:hover {
+      border-color: var(--color-primary);
+      background: var(--color-surface-elevated);
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
     }
 
     .reset-btn-compact {
-      background: rgba(255, 255, 255, 0.2);
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      color: white;
-      padding: 4px 8px;
-      border-radius: 3px;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      color: var(--color-text-secondary);
+      padding: var(--space-2) var(--space-3);
+      border-radius: var(--radius-md);
       cursor: pointer;
-      font-size: 14px;
+      font-size: 1rem;
       line-height: 1;
+      transition: all var(--transition-fast);
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
     }
 
     .reset-btn-compact:hover {
-      background: rgba(255, 255, 255, 0.3);
+      background: var(--color-surface-hover);
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+      transform: rotate(180deg);
+    }
+
+    .reset-btn-compact:focus {
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.2);
+    }
+
+    /* Two-row layout for better spacing when needed */
+    @media (max-width: 900px) {
+      .compact-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: 1fr 1fr;
+        gap: var(--space-3);
+        align-items: stretch;
+      }
+
+      .model-group-compact:nth-child(1) {
+        grid-column: 1 / 2;
+        grid-row: 1 / 2;
+      }
+
+      .model-group-compact:nth-child(2) {
+        grid-column: 2 / 3;
+        grid-row: 1 / 2;
+      }
+
+      .reset-btn-compact {
+        grid-column: 1 / 3;
+        grid-row: 2 / 3;
+        justify-self: center;
+        width: auto;
+        padding: var(--space-2) var(--space-4);
+      }
+    }
+
+    @media (max-width: 768px) {
+      .model-selector {
+        padding: var(--space-3) var(--space-4);
+      }
+
+      .compact-row {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--space-3);
+      }
+
+      .model-group-compact {
+        min-width: auto;
+      }
+
+      .model-group-compact label {
+        min-width: 50px;
+      }
+
+      select {
+        min-width: auto;
+      }
+
+      .reset-btn-compact {
+        align-self: center;
+        width: 32px;
+        padding: var(--space-2) var(--space-3);
+      }
     }
   `]
 })
