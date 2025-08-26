@@ -1,13 +1,13 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
-import { ModelsConfigService, RAGModelSelection } from './models-config.service';
+import { ModelsConfigService, RAGModelSelection, DynamicModelSelection } from './models-config.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class GlobalModelSelectionService {
-  private currentSelectionSubject = new BehaviorSubject<RAGModelSelection | null>(null);
-  public currentSelection$: Observable<RAGModelSelection | null> = this.currentSelectionSubject.asObservable();
+  private currentSelectionSubject = new BehaviorSubject<DynamicModelSelection | null>(null);
+  public currentSelection$: Observable<DynamicModelSelection | null> = this.currentSelectionSubject.asObservable();
   
   private currentAppSubject = new BehaviorSubject<string>('rag');
   public currentApp$: Observable<string> = this.currentAppSubject.asObservable();
@@ -20,11 +20,11 @@ export class GlobalModelSelectionService {
     }
   }
 
-  getCurrentSelection(): RAGModelSelection | null {
+  getCurrentSelection(): DynamicModelSelection | null {
     return this.currentSelectionSubject.value;
   }
 
-  updateSelection(selection: RAGModelSelection): void {
+  updateSelection(selection: DynamicModelSelection): void {
     console.log('Global service updating selection to:', selection);
     this.currentSelectionSubject.next(selection);
   }
@@ -45,9 +45,22 @@ export class GlobalModelSelectionService {
   }
 
   // Convenience method for components to get current selection synchronously
-  getSelectionForRequest(): RAGModelSelection | undefined {
+  getSelectionForRequest(): DynamicModelSelection | undefined {
     const selection = this.getCurrentSelection();
     console.log('Getting selection for request:', selection);
     return selection || undefined;
+  }
+
+  // Backwards compatibility method for RAG components that expect RAGModelSelection
+  getRAGSelectionForRequest(): RAGModelSelection | undefined {
+    const selection = this.getCurrentSelection();
+    if (!selection || !selection['llm'] || !selection['embed']) {
+      return undefined;
+    }
+    
+    return {
+      llm: selection['llm'],
+      embed: selection['embed']
+    };
   }
 }

@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { Firestore, collection, doc, addDoc, getDocs, query, where, orderBy, Timestamp } from '@angular/fire/firestore';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { Auth } from '@angular/fire/auth';
-import { RAGModelSelection } from './models-config.service';
+import { DynamicModelSelection } from './models-config.service';
 
 export interface ChatSession {
   id?: string;
@@ -103,7 +103,7 @@ export class ChatService {
     } as ChatMessage));
   }
 
-  async sendMessage(sessionId: string, message: string, restrictDocId?: string, modelSelection?: RAGModelSelection): Promise<ChatMessage> {
+  async sendMessage(sessionId: string, message: string, restrictDocId?: string, modelSelection?: DynamicModelSelection): Promise<ChatMessage> {
     if (!this.auth.currentUser) {
       throw new Error('User not authenticated');
     }
@@ -133,10 +133,14 @@ export class ChatService {
 
       // Add model selection if provided
       if (modelSelection) {
-        ragRequest.llmProvider = modelSelection.llm.provider;
-        ragRequest.llmModel = modelSelection.llm.model;
-        ragRequest.embedProvider = modelSelection.embed.provider;
-        ragRequest.embedModel = modelSelection.embed.model;
+        if (modelSelection['llm']) {
+          ragRequest.llmProvider = modelSelection['llm'].provider;
+          ragRequest.llmModel = modelSelection['llm'].model;
+        }
+        if (modelSelection['embed']) {
+          ragRequest.embedProvider = modelSelection['embed'].provider;
+          ragRequest.embedModel = modelSelection['embed'].model;
+        }
         console.log('Chat service sending RAG request with models:', {
           llmProvider: ragRequest.llmProvider,
           llmModel: ragRequest.llmModel,
@@ -189,7 +193,7 @@ export class ChatService {
     }
   }
 
-  async sendGeneralMessage(message: string, modelSelection?: RAGModelSelection): Promise<ChatMessage> {
+  async sendGeneralMessage(message: string, modelSelection?: DynamicModelSelection): Promise<ChatMessage> {
     if (!this.auth.currentUser) {
       throw new Error('User not authenticated');
     }
@@ -200,9 +204,9 @@ export class ChatService {
       };
 
       // Add model selection if provided
-      if (modelSelection) {
-        generalRequest.llmProvider = modelSelection.llm.provider;
-        generalRequest.llmModel = modelSelection.llm.model;
+      if (modelSelection && modelSelection['llm']) {
+        generalRequest.llmProvider = modelSelection['llm'].provider;
+        generalRequest.llmModel = modelSelection['llm'].model;
         console.log('Chat service sending general request with models:', {
           llmProvider: generalRequest.llmProvider,
           llmModel: generalRequest.llmModel

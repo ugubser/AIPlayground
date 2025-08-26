@@ -86,9 +86,9 @@ export class DocumentService {
         const modelSelection = this.globalModelSelection.getCurrentSelection();
         const embedRequest: any = { texts };
         
-        if (modelSelection?.embed) {
-          embedRequest.provider = modelSelection.embed.provider;
-          embedRequest.model = modelSelection.embed.model;
+        if (modelSelection?.['embed']) {
+          embedRequest.provider = modelSelection['embed'].provider;
+          embedRequest.model = modelSelection['embed'].model;
         }
         
         const { data } = await this.embedChunks(embedRequest);

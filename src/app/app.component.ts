@@ -3,8 +3,8 @@ import { CommonModule } from '@angular/common';
 import { RouterOutlet, NavigationEnd, Router } from '@angular/router';
 import { AuthService } from './services/auth.service';
 import { GlobalModelSelectionService } from './services/global-model-selection.service';
-import { ModelSelectorComponent } from './components/model-selector/model-selector.component';
-import { RAGModelSelection } from './services/models-config.service';
+import { DynamicModelSelectorComponent } from './components/dynamic-model-selector/dynamic-model-selector.component';
+import { DynamicModelSelection } from './services/models-config.service';
 import { Observable } from 'rxjs';
 import { User } from '@angular/fire/auth';
 import { filter } from 'rxjs/operators';
@@ -12,7 +12,7 @@ import { filter } from 'rxjs/operators';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, ModelSelectorComponent],
+  imports: [CommonModule, RouterOutlet, DynamicModelSelectorComponent],
   templateUrl: './app.component.html',
   styleUrl: './app.component.css'
 })
@@ -63,7 +63,7 @@ export class AppComponent implements OnInit {
     }
   }
 
-  onGlobalModelSelectionChange(selection: RAGModelSelection) {
+  onGlobalModelSelectionChange(selection: DynamicModelSelection) {
     console.log('App component received model selection change:', selection);
     this.globalModelSelection.updateSelection(selection);
   }

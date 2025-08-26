@@ -15,11 +15,11 @@
       <!-- Global Model Configuration -->
       <div class="header-controls" *ngIf="user$ | async">
         <div class="model-config-wrapper">
-          <app-model-selector 
+          <app-dynamic-model-selector 
             [appName]="currentAppName"
             [showCurrentSelection]="false"
             (selectionChange)="onGlobalModelSelectionChange($event)">
-          </app-model-selector>
+          </app-dynamic-model-selector>
         </div>
       </div>
 

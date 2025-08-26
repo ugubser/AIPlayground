@@ -1,4 +1,4 @@
-import modelsConfig from '../../shared/config/models.config.json';
+import modelsConfig from './models.config.json';
 
 export interface ModelConfig {
   [appName: string]: {

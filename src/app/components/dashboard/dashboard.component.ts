@@ -7,7 +7,7 @@ import { DocumentService, DocumentData } from '../../services/document.service';
 import { ChatService, ChatSession, ChatMessage } from '../../services/chat.service';
 import { AuthService } from '../../services/auth.service';
 import { GlobalModelSelectionService } from '../../services/global-model-selection.service';
-import { RAGModelSelection } from '../../services/models-config.service';
+import { DynamicModelSelection } from '../../services/models-config.service';
 
 @Component({
   selector: 'app-dashboard',

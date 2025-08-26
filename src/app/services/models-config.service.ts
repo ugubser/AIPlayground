@@ -19,6 +19,10 @@ export interface RAGModelSelection {
   embed: ModelSelection;
 }
 
+export interface DynamicModelSelection {
+  [modelType: string]: ModelSelection;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -47,25 +51,45 @@ export class ModelsConfigService {
     return app[modelType][provider];
   }
 
-  getDefaultSelection(appName: string): RAGModelSelection | null {
-    if (appName !== 'rag') return null;
+  getDefaultSelection(appName: string): DynamicModelSelection | null {
+    const modelTypes = this.getModelTypes(appName);
+    if (modelTypes.length === 0) return null;
 
-    // Default to current working configuration
-    return {
-      llm: {
-        provider: 'openrouter.ai',
-        model: 'meta-llama/llama-3.3-70b-instruct'
-      },
-      embed: {
-        provider: 'together.ai',
-        model: 'BAAI/bge-base-en-v1.5-vllm'
+    const selection: DynamicModelSelection = {};
+    
+    for (const modelType of modelTypes) {
+      const providers = this.getProviders(appName, modelType);
+      if (providers.length > 0) {
+        const firstProvider = providers[0];
+        const models = this.getModels(appName, modelType, firstProvider);
+        if (models.length > 0) {
+          selection[modelType.toLowerCase()] = {
+            provider: firstProvider,
+            model: models[0]
+          };
+        }
       }
-    };
+    }
+    
+    return Object.keys(selection).length > 0 ? selection : null;
   }
 
   validateSelection(appName: string, modelType: string, provider: string, model: string): boolean {
     const models = this.getModels(appName, modelType, provider);
     return models.includes(model);
+  }
+
+  // Backwards compatibility method for RAG
+  getDefaultRAGSelection(): RAGModelSelection | null {
+    const dynamicSelection = this.getDefaultSelection('rag');
+    if (!dynamicSelection || !dynamicSelection['llm'] || !dynamicSelection['embed']) {
+      return null;
+    }
+    
+    return {
+      llm: dynamicSelection['llm'],
+      embed: dynamicSelection['embed']
+    };
   }
 
   getProviderApiUrl(provider: string, modelType: string): string {
