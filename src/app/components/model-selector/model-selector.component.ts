@@ -59,45 +59,45 @@ import { ModelsConfigService, RAGModelSelection } from '../../services/models-co
     .compact-row {
       display: flex;
       align-items: center;
-      gap: var(--space-4);
+      gap: var(--space-3);
       flex-wrap: wrap;
     }
 
     .model-group-compact {
       display: flex;
       align-items: center;
-      gap: var(--space-2);
+      gap: var(--space-1);
       flex: 1;
-      min-width: 200px;
+      min-width: 180px;
     }
 
     .model-group-compact label {
-      font-size: 0.75rem;
+      font-size: 0.6875rem;
       font-weight: var(--font-weight-semibold);
       color: var(--color-text-secondary);
       text-transform: uppercase;
       letter-spacing: 0.05em;
-      min-width: 40px;
+      min-width: 35px;
       flex-shrink: 0;
     }
 
     select {
       flex: 1;
-      padding: var(--space-2) var(--space-3);
+      padding: var(--space-1) var(--space-2);
       border: 1px solid var(--color-border);
       border-radius: var(--radius-md);
-      font-size: 0.8125rem;
+      font-size: 0.75rem;
       font-family: var(--font-family-primary);
       background: var(--color-surface-elevated);
       color: var(--color-text-primary);
-      min-width: 120px;
+      min-width: 100px;
       transition: all var(--transition-fast);
       appearance: none;
       background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23b3b3b3' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
-      background-position: right var(--space-2) center;
+      background-position: right var(--space-1) center;
       background-repeat: no-repeat;
-      background-size: 1rem;
-      padding-right: var(--space-8);
+      background-size: 0.875rem;
+      padding-right: var(--space-6);
       box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
     }
 

@@ -27,7 +27,7 @@
         <div class="auth-section" *ngIf="user$ | async as user; else signInButton">
           <div class="user-status">
             <div class="status-indicator"></div>
-            <span class="user-info">Connected</span>
+            <span class="user-info">Logged in</span>
           </div>
           <button class="btn btn-ghost" (click)="signOut()">Sign Out</button>
         </div>
