@@ -1,6 +1,16 @@
 <div class="app-container">
   <header class="app-header">
     <h1>🤖 {{ title }}</h1>
+    
+    <!-- Global Model Configuration -->
+    <div class="model-config-section" *ngIf="user$ | async">
+      <app-model-selector 
+        appName="rag"
+        [showCurrentSelection]="false"
+        (selectionChange)="onGlobalModelSelectionChange($event)">
+      </app-model-selector>
+    </div>
+
     <div class="auth-section" *ngIf="user$ | async as user; else signInButton">
       <span class="user-info">Signed in</span>
       <button class="btn btn-secondary" (click)="signOut()">Sign Out</button>

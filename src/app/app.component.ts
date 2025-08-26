@@ -2,13 +2,16 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterOutlet } from '@angular/router';
 import { AuthService } from './services/auth.service';
+import { GlobalModelSelectionService } from './services/global-model-selection.service';
+import { ModelSelectorComponent } from './components/model-selector/model-selector.component';
+import { RAGModelSelection } from './services/models-config.service';
 import { Observable } from 'rxjs';
 import { User } from '@angular/fire/auth';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, RouterOutlet],
+  imports: [CommonModule, RouterOutlet, ModelSelectorComponent],
   templateUrl: './app.component.html',
   styleUrl: './app.component.css'
 })
@@ -17,7 +20,10 @@ export class AppComponent implements OnInit {
   user$: Observable<User | null>;
   loading = false;
 
-  constructor(private authService: AuthService) {
+  constructor(
+    private authService: AuthService,
+    private globalModelSelection: GlobalModelSelectionService
+  ) {
     this.user$ = this.authService.user$;
   }
 
@@ -47,5 +53,10 @@ export class AppComponent implements OnInit {
     } catch (error) {
       console.error('Failed to sign out:', error);
     }
+  }
+
+  onGlobalModelSelectionChange(selection: RAGModelSelection) {
+    console.log('App component received model selection change:', selection);
+    this.globalModelSelection.updateSelection(selection);
   }
 }

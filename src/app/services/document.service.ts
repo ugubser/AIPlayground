@@ -4,6 +4,7 @@ import { Storage, ref, uploadBytes, getDownloadURL } from '@angular/fire/storage
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { Auth } from '@angular/fire/auth';
 import { ChunkData } from './pdf-processor.service';
+import { GlobalModelSelectionService } from './global-model-selection.service';
 
 export interface DocumentData {
   id?: string;
@@ -27,13 +28,14 @@ export interface ChunkWithEmbedding extends ChunkData {
   providedIn: 'root'
 })
 export class DocumentService {
-  private embedChunks = httpsCallable<{texts: string[]}, {vectors: number[][]}>(this.functions, 'embedChunks');
+  private embedChunks = httpsCallable<{texts: string[], provider?: string, model?: string}, {vectors: number[][]}>(this.functions, 'embedChunks');
 
   constructor(
     private firestore: Firestore,
     private storage: Storage,
     private functions: Functions,
-    private auth: Auth
+    private auth: Auth,
+    private globalModelSelection: GlobalModelSelectionService
   ) { }
 
   async uploadPdf(file: File): Promise<string> {
@@ -79,7 +81,17 @@ export class DocumentService {
       
       try {
         console.log(`Getting embeddings for batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(chunks.length/batchSize)}`);
-        const { data } = await this.embedChunks({ texts });
+        
+        // Get current model selection for embeddings
+        const modelSelection = this.globalModelSelection.getCurrentSelection();
+        const embedRequest: any = { texts };
+        
+        if (modelSelection?.embed) {
+          embedRequest.provider = modelSelection.embed.provider;
+          embedRequest.model = modelSelection.embed.model;
+        }
+        
+        const { data } = await this.embedChunks(embedRequest);
         
         const promises = batch.map(async (chunk, index) => {
           const chunkWithEmbedding: Omit<ChunkWithEmbedding, 'id'> = {

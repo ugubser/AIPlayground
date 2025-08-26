@@ -6,6 +6,8 @@ import { PdfProcessorService, ChunkData } from '../../services/pdf-processor.ser
 import { DocumentService, DocumentData } from '../../services/document.service';
 import { ChatService, ChatSession, ChatMessage } from '../../services/chat.service';
 import { AuthService } from '../../services/auth.service';
+import { GlobalModelSelectionService } from '../../services/global-model-selection.service';
+import { RAGModelSelection } from '../../services/models-config.service';
 
 @Component({
   selector: 'app-dashboard',
@@ -36,7 +38,8 @@ export class DashboardComponent implements OnInit {
     private pdfProcessor: PdfProcessorService,
     private documentService: DocumentService,
     private chatService: ChatService,
-    private authService: AuthService
+    private authService: AuthService,
+    private globalModelSelection: GlobalModelSelectionService
   ) {}
 
   ngOnInit() {
@@ -180,7 +183,8 @@ export class DashboardComponent implements OnInit {
       const response = await this.chatService.sendMessage(
         this.currentSession.id!,
         messageText,
-        this.selectedDocument?.id
+        this.selectedDocument?.id,
+        this.globalModelSelection.getSelectionForRequest()
       );
       
       // Replace or add the assistant message
@@ -205,6 +209,7 @@ export class DashboardComponent implements OnInit {
       this.sendMessage();
     }
   }
+
 
   setActiveTab(tab: 'documents' | 'chat') {
     this.activeTab = tab;

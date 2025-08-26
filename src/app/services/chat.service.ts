@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { Firestore, collection, doc, addDoc, getDocs, query, where, orderBy, Timestamp } from '@angular/fire/firestore';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { Auth } from '@angular/fire/auth';
+import { RAGModelSelection } from './models-config.service';
 
 export interface ChatSession {
   id?: string;
@@ -98,7 +99,7 @@ export class ChatService {
     } as ChatMessage));
   }
 
-  async sendMessage(sessionId: string, message: string, restrictDocId?: string): Promise<ChatMessage> {
+  async sendMessage(sessionId: string, message: string, restrictDocId?: string, modelSelection?: RAGModelSelection): Promise<ChatMessage> {
     if (!this.auth.currentUser) {
       throw new Error('User not authenticated');
     }
@@ -118,13 +119,31 @@ export class ChatService {
     );
 
     try {
-      // Get RAG response
-      const { data } = await this.chatRag({
+      // Get RAG response with model configuration
+      const ragRequest: any = {
         sessionId,
         message,
         k: 8,
         restrictDocId
-      });
+      };
+
+      // Add model selection if provided
+      if (modelSelection) {
+        ragRequest.llmProvider = modelSelection.llm.provider;
+        ragRequest.llmModel = modelSelection.llm.model;
+        ragRequest.embedProvider = modelSelection.embed.provider;
+        ragRequest.embedModel = modelSelection.embed.model;
+        console.log('Chat service sending RAG request with models:', {
+          llmProvider: ragRequest.llmProvider,
+          llmModel: ragRequest.llmModel,
+          embedProvider: ragRequest.embedProvider,
+          embedModel: ragRequest.embedModel
+        });
+      } else {
+        console.log('Chat service: No model selection provided, using defaults');
+      }
+
+      const { data } = await this.chatRag(ragRequest);
 
       // Save assistant message
       const assistantMessage: Omit<ChatMessage, 'id'> = {

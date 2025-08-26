@@ -84,6 +84,45 @@ A Retrieval-Augmented Generation (RAG) chatbot built with Angular, Firebase, Tog
 4. **Filter by document** to ask questions about specific files
 5. **View sources** - see which document chunks were used to answer questions
 
+## How RAG (Retrieval-Augmented Generation) Works
+
+This system implements a RAG architecture to enable question-answering over PDF documents. Here's how it works:
+
+### **Phase 1: Document Processing & Storage** (Upload)
+
+When you upload a PDF document:
+
+1. **PDF Text Extraction**: PDF.js extracts text from each page of the PDF
+2. **Text Chunking**: LangChain's RecursiveCharacterTextSplitter breaks the text into 400-character chunks with 50-character overlap
+3. **Embedding Generation**: Each chunk is sent to Together.ai's `BAAI/bge-base-en-v1.5-vllm` model to create vector embeddings (numerical representations of semantic meaning)
+4. **Storage**: Both the text chunks and their embeddings are stored in Firestore for later retrieval
+
+### **Phase 2: Question Answering** (Chat)
+
+When you ask a question:
+
+1. **Query Embedding**: Your question is sent to the **same embedding model** (`BAAI/bge-base-en-v1.5-vllm`) to create a vector representation
+2. **Similarity Search**: The system compares your question vector to all stored chunk vectors using cosine similarity:
+   - Cosine similarity measures the angle between vectors
+   - Closer angles = more semantically similar content
+   - Returns the top K (default 8) most relevant chunks
+3. **Context Assembly**: The most relevant chunks are combined into a context string like:
+   ```
+   [#1 p.5] This chunk talks about machine learning algorithms...
+   [#2 p.12] Another relevant section about neural networks...
+   [#3 p.8] More context about AI applications...
+   ```
+4. **Answer Generation**: The context + your question is sent to OpenRouter's LLaMA 3.1-70B model with instructions to answer ONLY using the provided context
+
+### **Why This Works**
+
+- **Same Embedding Space**: Documents and queries use the same model, so semantically similar content has similar vectors
+- **Semantic Search**: Vector similarity finds relevant content even when exact words don't match
+- **Focused Context**: Only the most relevant chunks are sent to the LLM, keeping responses focused and accurate
+- **Grounded Responses**: The LLM can only use retrieved context, preventing hallucination
+
+**Example**: If you ask "How does machine learning work?", the embedding captures the semantic meaning, finds chunks about ML concepts from your uploaded documents, and the LLM synthesizes an answer using only those specific sections.
+
 ## Architecture
 
 ```
@@ -102,7 +141,8 @@ A Retrieval-Augmented Generation (RAG) chatbot built with Angular, Firebase, Tog
 │                Firebase Services                    │
 │  ┌─────────┐ ┌──────────┐ ┌─────────┐ ┌────────────┐ │
 │  │   Auth  │ │ Firestore│ │ Storage │ │ Functions  │ │
-│  │         │ │          │ │         │ │            │ │
+│  │         │ │ (chunks + │ │ (PDFs)  │ │(embedChunks│ │
+│  │         │ │embeddings)│ │         │ │ & chatRag) │ │
 │  └─────────┘ └──────────┘ └─────────┘ └────────────┘ │
 └─────────────────┬───────────────────────────────────┘
                   │
@@ -112,7 +152,9 @@ A Retrieval-Augmented Generation (RAG) chatbot built with Angular, Firebase, Tog
 │              External APIs                          │
 │  ┌─────────────────┐      ┌─────────────────────────┐ │
 │  │   Together.ai   │      │      OpenRouter        │ │
-│  │  (Embeddings)   │      │    (Chat Completion)   │ │
+│  │ BAAI/bge-base-  │      │ meta-llama/llama-3.1-  │ │
+│  │ en-v1.5-vllm    │      │ 70b-instruct           │ │
+│  │ (Embeddings)    │      │ (Chat Completion)      │ │
 │  └─────────────────┘      └─────────────────────────┘ │
 └─────────────────────────────────────────────────────┘
 ```

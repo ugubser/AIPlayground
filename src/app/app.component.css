@@ -12,6 +12,7 @@
   justify-content: space-between;
   align-items: center;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  gap: 2rem;
 }
 
 .app-header h1 {
@@ -101,3 +102,15 @@
   font-style: italic;
   opacity: 0.8;
 }
+
+.model-config-section {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  max-width: 600px;
+}
+
+.model-config-section app-model-selector {
+  width: 100%;
+}
+
