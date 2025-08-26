@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { Auth, signInAnonymously, signOut, onAuthStateChanged, User } from '@angular/fire/auth';
+import { Auth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged, User } from '@angular/fire/auth';
 import { BehaviorSubject, Observable } from 'rxjs';
 
 @Injectable({
@@ -15,11 +15,12 @@ export class AuthService {
     });
   }
 
-  async signInAnonymously(): Promise<void> {
+  async signInWithGoogle(): Promise<void> {
     try {
-      await signInAnonymously(this.auth);
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(this.auth, provider);
     } catch (error) {
-      console.error('Error signing in:', error);
+      console.error('Error signing in with Google:', error);
       throw error;
     }
   }

@@ -31,25 +31,18 @@ export class AppComponent implements OnInit {
   }
 
   ngOnInit() {
-    // Auto sign-in anonymously if not authenticated
-    this.user$.subscribe(user => {
-      if (!user && !this.loading) {
-        this.signInAnonymously();
-      }
-    });
-
     // Subscribe to current app changes
     this.globalModelSelection.currentApp$.subscribe(appName => {
       this.currentAppName = appName;
     });
   }
 
-  async signInAnonymously() {
+  async signInWithGoogle() {
     this.loading = true;
     try {
-      await this.authService.signInAnonymously();
+      await this.authService.signInWithGoogle();
     } catch (error) {
-      console.error('Failed to sign in:', error);
+      console.error('Failed to sign in with Google:', error);
     } finally {
       this.loading = false;
     }

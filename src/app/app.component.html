@@ -27,7 +27,7 @@
         <div class="auth-section" *ngIf="user$ | async as user; else signInButton">
           <div class="user-status">
             <div class="status-indicator"></div>
-            <span class="user-info">Logged in</span>
+            <span class="user-info">{{ user.displayName || user.email }}</span>
           </div>
           <button class="btn btn-ghost" (click)="signOut()">Sign Out</button>
         </div>
@@ -37,8 +37,8 @@
               <div class="loading-spinner"></div>
               <span class="loading-text">Connecting...</span>
             </div>
-            <button *ngIf="!loading" class="btn btn-primary" (click)="signInAnonymously()">
-              Get Started
+            <button *ngIf="!loading" class="btn btn-primary" (click)="signInWithGoogle()">
+              Sign in with Google
             </button>
           </div>
         </ng-template>
@@ -64,13 +64,13 @@
         <h2 class="hero-title">Welcome to AI Playground</h2>
         <p class="hero-description">
           Start exploring the power of AI with intelligent document analysis and conversational AI capabilities. 
-          Connect to begin your journey.
+          Please sign in with your Google account to continue.
         </p>
-        <button class="btn btn-primary btn-lg" (click)="signInAnonymously()" [disabled]="loading">
-          <span *ngIf="!loading">Get Started</span>
+        <button class="btn btn-primary btn-lg" (click)="signInWithGoogle()" [disabled]="loading">
+          <span *ngIf="!loading">Sign in with Google</span>
           <span *ngIf="loading" class="loading-content">
             <div class="loading-spinner"></div>
-            Connecting...
+            Signing in...
           </span>
         </button>
       </div>
