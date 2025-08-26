@@ -1,5 +1,4 @@
-import { Injectable } from '@angular/core';
-import modelsConfig from '../../../shared/config/models.config.json';
+import modelsConfig from '../../shared/config/models.config.json';
 
 export interface ModelConfig {
   [appName: string]: {
@@ -19,13 +18,8 @@ export interface RAGModelSelection {
   embed: ModelSelection;
 }
 
-@Injectable({
-  providedIn: 'root'
-})
 export class ModelsConfigService {
   private config: ModelConfig = modelsConfig;
-
-  constructor() { }
 
   getApps(): string[] {
     return Object.keys(this.config);
@@ -50,15 +44,15 @@ export class ModelsConfigService {
   getDefaultSelection(appName: string): RAGModelSelection | null {
     if (appName !== 'rag') return null;
 
-    // Default to current working configuration
+    // These should only be used as absolute fallbacks when UI doesn't provide models
     return {
       llm: {
         provider: 'openrouter.ai',
-        model: 'meta-llama/llama-3.3-70b-instruct'
+        model: 'openai/gpt-oss-20b:free'
       },
       embed: {
         provider: 'together.ai',
-        model: 'BAAI/bge-base-en-v1.5-vllm'
+        model: 'BAAI/bge-base-en-v1.5'
       }
     };
   }
@@ -88,7 +82,7 @@ export class ModelsConfigService {
     return urls[provider]?.[modelType] || '';
   }
 
-  getProviderHeaders(provider: string, apiKey: string): { [key: string]: string } {
+  getProviderHeaders(provider: string, apiKey: string, appName?: string): { [key: string]: string } {
     const headers: { [key: string]: string } = {
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json'
@@ -96,9 +90,25 @@ export class ModelsConfigService {
 
     if (provider === 'openrouter.ai') {
       headers['HTTP-Referer'] = 'https://aiplayground-6e5be.web.app';
-      headers['X-Title'] = 'Firebase RAG Chatbot';
+      headers['X-Title'] = appName === 'chat' ? 'Vanguard Signals AI Playground' : 'Firebase RAG Chatbot';
     }
 
     return headers;
   }
+
+  getApiKeyEnvVar(provider: string): string {
+    const envVars: { [key: string]: string } = {
+      'together.ai': 'TOGETHER_API_KEY',
+      'openrouter.ai': 'OPENROUTER_API_KEY',
+      'ollama': 'OLLAMA_API_KEY'
+    };
+
+    return envVars[provider] || 'UNKNOWN_API_KEY';
+  }
+
+  supportsEmbeddings(provider: string): boolean {
+    return ['together.ai', 'ollama'].includes(provider);
+  }
 }
+
+export const modelsConfigService = new ModelsConfigService();

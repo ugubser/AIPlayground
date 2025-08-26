@@ -4,10 +4,15 @@
       "openrouter.ai": [
         "openai/gpt-oss-20b:free",
         "z-ai/glm-4.5-air:free",
-        "meta-llama/llama-4-maverick:free"
+        "meta-llama/llama-4-maverick:free",
+        "qwen/qwen3-coder:free",
+        "moonshotai/kimi-k2:free",
+        "google/gemma-3n-e2b-it:free"
       ],
       "together.ai": [
-        "deepseek-ai/DeepSeek-R1-Distill-Llama-70B-free"
+        "deepseek-ai/DeepSeek-R1-Distill-Llama-70B-free",
+        "lgai/exaone-deep-32b",
+        "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
       ]
     },
     "EMBED": {
@@ -15,6 +20,9 @@
         "BAAI/bge-base-en-v1.5",
         "BAAI/bge-large-en-v1.5",
         "intfloat/multilingual-e5-large-instruct"
+      ],
+      "ollama": [
+        "bge-m3"
       ]
     }
   },
@@ -26,7 +34,9 @@
         "meta-llama/llama-4-maverick:free"
       ],
       "together.ai": [
-        "deepseek-ai/DeepSeek-R1-Distill-Llama-70B-free"
+        "deepseek-ai/DeepSeek-R1-Distill-Llama-70B-free",
+        "lgai/exaone-deep-32b",
+        "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
       ]
     }
   },

@@ -1,13 +1,12 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import fetch from 'node-fetch';
+import { modelsConfigService } from './models-config';
 
 admin.initializeApp();
 const db = admin.firestore();
 
 const isEmulator = process.env.FUNCTIONS_EMULATOR === 'true';
-
-const TOGETHER_URL = 'https://api.together.xyz/v1/embeddings';
 
 function cosine(a: number[], b: number[]): number {
   if (a.length !== b.length) return 0;
@@ -35,7 +34,7 @@ export const embedChunks = functions
     const { 
       texts, 
       provider = 'together.ai', 
-      model = 'BAAI/bge-base-en-v1.5-vllm' 
+      model = 'BAAI/bge-base-en-v1.5' 
     } = data as { 
       texts: string[]; 
       provider?: string; 
@@ -50,8 +49,13 @@ export const embedChunks = functions
       throw new functions.https.HttpsError('invalid-argument', 'Maximum 256 texts per batch');
     }
 
+    // Validate provider supports embeddings
+    if (!modelsConfigService.supportsEmbeddings(provider)) {
+      throw new functions.https.HttpsError('invalid-argument', `Provider ${provider} does not support embeddings`);
+    }
+
     // Get API key based on provider
-    const apiKeyEnvVar = provider === 'together.ai' ? 'TOGETHER_API_KEY' : 'OPENROUTER_API_KEY';
+    const apiKeyEnvVar = modelsConfigService.getApiKeyEnvVar(provider);
     const key = process.env[apiKeyEnvVar];
     if (!key) {
       console.error(`${apiKeyEnvVar} not found in environment`);
@@ -60,13 +64,9 @@ export const embedChunks = functions
     console.log(`${apiKeyEnvVar} found:`, !!key);
 
     // Get API URL based on provider
-    const apiUrl = provider === 'together.ai' 
-      ? 'https://api.together.xyz/v1/embeddings'
-      : 'https://openrouter.ai/api/v1/embeddings'; // Note: OpenRouter doesn't have embeddings API
-
-    // Validate provider supports embeddings
-    if (provider !== 'together.ai') {
-      throw new functions.https.HttpsError('invalid-argument', 'Only together.ai provider supports embeddings');
+    const apiUrl = modelsConfigService.getProviderApiUrl(provider, 'EMBED');
+    if (!apiUrl) {
+      throw new functions.https.HttpsError('internal', `No API URL configured for provider ${provider} and model type EMBED`);
     }
 
     try {
@@ -77,10 +77,7 @@ export const embedChunks = functions
         input: texts
       };
 
-      const headers = {
-        'Authorization': `Bearer ${key}`,
-        'Content-Type': 'application/json'
-      };
+      const headers = modelsConfigService.getProviderHeaders(provider, key);
 
       if (isEmulator) {
         console.log('🔍 Embedding Request:', JSON.stringify({
@@ -104,21 +101,21 @@ export const embedChunks = functions
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Together API error:', {
+        console.error(`${provider} API error:`, {
           status: response.status,
           statusText: response.statusText,
-          url: TOGETHER_URL,
+          url: apiUrl,
           error: errorText,
           hasApiKey: !!key
         });
-        throw new functions.https.HttpsError('internal', `Together API error: ${response.statusText} - ${errorText}`);
+        throw new functions.https.HttpsError('internal', `${provider} API error: ${response.statusText} - ${errorText}`);
       }
 
       const json = await response.json() as any;
       const vectors = (json.data || []).map((d: any) => d.embedding);
       
       if (isEmulator) {
-        console.log('📤 Together.ai Response:', JSON.stringify({
+        console.log(`📤 ${provider} Response:`, JSON.stringify({
           status: response.status,
           statusText: response.statusText,
           data: {
@@ -164,11 +161,13 @@ export const chatRag = functions
       embedModel
     } = data;
 
-    // Use provided models or fall back to defaults
-    const actualLlmProvider = llmProvider || 'openrouter.ai';
-    const actualLlmModel = llmModel || 'meta-llama/llama-3.3-70b-instruct';
-    const actualEmbedProvider = embedProvider || 'together.ai';
-    const actualEmbedModel = embedModel || 'BAAI/bge-base-en-v1.5-vllm';
+    // Use provided models from UI - these should always be provided by the frontend
+    // Fallback to config defaults only if UI doesn't provide them
+    const defaults = modelsConfigService.getDefaultSelection('rag');
+    const actualLlmProvider = llmProvider || defaults?.llm.provider || 'openrouter.ai';
+    const actualLlmModel = llmModel || defaults?.llm.model || 'openai/gpt-oss-20b:free';
+    const actualEmbedProvider = embedProvider || defaults?.embed.provider || 'together.ai';
+    const actualEmbedModel = embedModel || defaults?.embed.model || 'BAAI/bge-base-en-v1.5';
 
     console.log('Received model parameters:', { llmProvider, llmModel, embedProvider, embedModel });
     console.log('Using models:', { actualLlmProvider, actualLlmModel, actualEmbedProvider, actualEmbedModel });
@@ -183,20 +182,21 @@ export const chatRag = functions
       console.log(`Processing RAG query for user ${uid}: "${message.substring(0, 100)}..." using LLM: ${actualLlmProvider}/${actualLlmModel}, Embed: ${actualEmbedProvider}/${actualEmbedModel}`);
 
       // 1) Embed the query
-      const embedApiKeyEnvVar = actualEmbedProvider === 'together.ai' ? 'TOGETHER_API_KEY' : 'OPENROUTER_API_KEY';
+      // Validate embed provider supports embeddings
+      if (!modelsConfigService.supportsEmbeddings(actualEmbedProvider)) {
+        throw new functions.https.HttpsError('invalid-argument', `Provider ${actualEmbedProvider} does not support embeddings`);
+      }
+
+      const embedApiKeyEnvVar = modelsConfigService.getApiKeyEnvVar(actualEmbedProvider);
       const embedKey = process.env[embedApiKeyEnvVar];
       if (!embedKey) {
         console.error(`${embedApiKeyEnvVar} not found for embedding`);
         throw new functions.https.HttpsError('internal', `${embedApiKeyEnvVar} not configured`);
       }
 
-      const embedApiUrl = actualEmbedProvider === 'together.ai' 
-        ? 'https://api.together.xyz/v1/embeddings'
-        : 'https://openrouter.ai/api/v1/embeddings';
-
-      // Validate embed provider supports embeddings
-      if (actualEmbedProvider !== 'together.ai') {
-        throw new functions.https.HttpsError('invalid-argument', 'Only together.ai provider supports embeddings');
+      const embedApiUrl = modelsConfigService.getProviderApiUrl(actualEmbedProvider, 'EMBED');
+      if (!embedApiUrl) {
+        throw new functions.https.HttpsError('internal', `No API URL configured for provider ${actualEmbedProvider} and model type EMBED`);
       }
 
       const queryRequestBody = { 
@@ -204,10 +204,7 @@ export const chatRag = functions
         input: [message] 
       };
 
-      const embedHeaders = {
-        'Authorization': `Bearer ${embedKey}`,
-        'Content-Type': 'application/json'
-      };
+      const embedHeaders = modelsConfigService.getProviderHeaders(actualEmbedProvider, embedKey);
 
       if (isEmulator) {
         console.log('🔍 Query Embedding Request:', JSON.stringify({
@@ -237,7 +234,7 @@ export const chatRag = functions
       const queryVector: number[] = embJson.data?.[0]?.embedding ?? [];
 
       if (isEmulator) {
-        console.log('📤 Together.ai Query Embedding Response:', JSON.stringify({
+        console.log(`📤 ${actualEmbedProvider} Query Embedding Response:`, JSON.stringify({
           status: embResponse.status,
           statusText: embResponse.statusText,
           data: {
@@ -323,16 +320,17 @@ export const chatRag = functions
       const userPrompt = `CONTEXT:\n${context}\n\nQUESTION: ${message}`;
 
       // 4) Generate response with configurable LLM
-      const llmApiKeyEnvVar = actualLlmProvider === 'together.ai' ? 'TOGETHER_API_KEY' : 'OPENROUTER_API_KEY';
+      const llmApiKeyEnvVar = modelsConfigService.getApiKeyEnvVar(actualLlmProvider);
       const llmKey = process.env[llmApiKeyEnvVar];
       if (!llmKey) {
         console.error(`${llmApiKeyEnvVar} not found`);
         throw new functions.https.HttpsError('internal', `${llmApiKeyEnvVar} not configured`);
       }
 
-      const llmApiUrl = actualLlmProvider === 'together.ai' 
-        ? 'https://api.together.xyz/v1/chat/completions'
-        : 'https://openrouter.ai/api/v1/chat/completions';
+      const llmApiUrl = modelsConfigService.getProviderApiUrl(actualLlmProvider, 'LLM');
+      if (!llmApiUrl) {
+        throw new functions.https.HttpsError('internal', `No API URL configured for provider ${actualLlmProvider} and model type LLM`);
+      }
 
       const llmRequestBody = {
         model: actualLlmModel,
@@ -344,16 +342,7 @@ export const chatRag = functions
         max_tokens: 1000
       };
 
-      const llmHeaders: { [key: string]: string } = {
-        'Authorization': `Bearer ${llmKey}`,
-        'Content-Type': 'application/json'
-      };
-
-      // Add OpenRouter-specific headers
-      if (actualLlmProvider === 'openrouter.ai') {
-        llmHeaders['HTTP-Referer'] = 'https://aiplayground-6e5be.web.app';
-        llmHeaders['X-Title'] = 'Firebase RAG Chatbot';
-      }
+      const llmHeaders = modelsConfigService.getProviderHeaders(actualLlmProvider, llmKey, 'rag');
 
       if (isEmulator) {
         console.log('🔍 LLM Request:', JSON.stringify({
@@ -362,12 +351,7 @@ export const chatRag = functions
           url: llmApiUrl,
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${llmKey.substring(0, 10)}...`,
-            'Content-Type': 'application/json',
-            ...(actualLlmProvider === 'openrouter.ai' && {
-              'HTTP-Referer': 'https://aiplayground-6e5be.web.app',
-              'X-Title': 'Firebase RAG Chatbot'
-            })
+            ...modelsConfigService.getProviderHeaders(actualLlmProvider, `${llmKey.substring(0, 10)}...`, 'rag')
           },
           body: {
             ...llmRequestBody,
@@ -387,7 +371,7 @@ export const chatRag = functions
 
       if (!llmResponse.ok) {
         const errorText = await llmResponse.text();
-        console.error('OpenRouter API error:', llmResponse.status, errorText);
+        console.error(`${actualLlmProvider} API error:`, llmResponse.status, errorText);
         throw new functions.https.HttpsError('internal', 'Failed to generate response');
       }
 
@@ -443,9 +427,11 @@ export const generalChat = functions
 
     const { message, llmProvider, llmModel } = data;
 
-    // Use provided models or defaults
-    const actualLlmProvider = llmProvider || 'openrouter.ai';
-    const actualLlmModel = llmModel || 'openai/gpt-oss-20b:free';
+    // Use provided models from UI - these should always be provided by the frontend
+    // Fallback to config defaults only if UI doesn't provide them
+    const defaults = modelsConfigService.getDefaultSelection('rag');
+    const actualLlmProvider = llmProvider || defaults?.llm.provider || 'openrouter.ai';
+    const actualLlmModel = llmModel || defaults?.llm.model || 'openai/gpt-oss-20b:free';
 
     console.log('General chat request:', { actualLlmProvider, actualLlmModel });
 
@@ -455,16 +441,17 @@ export const generalChat = functions
 
     try {
       // Get LLM API key
-      const llmApiKeyEnvVar = actualLlmProvider === 'together.ai' ? 'TOGETHER_API_KEY' : 'OPENROUTER_API_KEY';
+      const llmApiKeyEnvVar = modelsConfigService.getApiKeyEnvVar(actualLlmProvider);
       const llmKey = process.env[llmApiKeyEnvVar];
       if (!llmKey) {
         console.error(`${llmApiKeyEnvVar} not found`);
         throw new functions.https.HttpsError('internal', `${llmApiKeyEnvVar} not configured`);
       }
 
-      const llmApiUrl = actualLlmProvider === 'together.ai' 
-        ? 'https://api.together.xyz/v1/chat/completions'
-        : 'https://openrouter.ai/api/v1/chat/completions';
+      const llmApiUrl = modelsConfigService.getProviderApiUrl(actualLlmProvider, 'LLM');
+      if (!llmApiUrl) {
+        throw new functions.https.HttpsError('internal', `No API URL configured for provider ${actualLlmProvider} and model type LLM`);
+      }
 
       const llmRequestBody = {
         model: actualLlmModel,
@@ -475,16 +462,7 @@ export const generalChat = functions
         max_tokens: 2000
       };
 
-      const llmHeaders: { [key: string]: string } = {
-        'Authorization': `Bearer ${llmKey}`,
-        'Content-Type': 'application/json'
-      };
-
-      // Add OpenRouter-specific headers
-      if (actualLlmProvider === 'openrouter.ai') {
-        llmHeaders['HTTP-Referer'] = 'https://aiplayground-6e5be.web.app';
-        llmHeaders['X-Title'] = 'Vanguard Signals AI Playground';
-      }
+      const llmHeaders = modelsConfigService.getProviderHeaders(actualLlmProvider, llmKey, 'chat');
 
       if (isEmulator) {
         console.log('🔍 General Chat LLM Request:', JSON.stringify({
@@ -493,12 +471,7 @@ export const generalChat = functions
           url: llmApiUrl,
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${llmKey.substring(0, 10)}...`,
-            'Content-Type': 'application/json',
-            ...(actualLlmProvider === 'openrouter.ai' && {
-              'HTTP-Referer': 'https://aiplayground-6e5be.web.app',
-              'X-Title': 'Vanguard Signals AI Playground'
-            })
+            ...modelsConfigService.getProviderHeaders(actualLlmProvider, `${llmKey.substring(0, 10)}...`, 'chat')
           },
           body: {
             ...llmRequestBody,
