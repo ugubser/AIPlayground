@@ -212,7 +212,7 @@
         </div>
 
         <div class="messages-container" *ngIf="currentSession">
-          <div class="messages-list">
+          <div class="messages-list" #ragMessagesContainer>
             <div 
               class="message"
               *ngFor="let message of messages"
@@ -290,7 +290,7 @@
       </div>
 
       <div class="messages-container">
-        <div class="messages-list">
+        <div class="messages-list" #generalMessagesContainer>
           <div 
             class="message"
             *ngFor="let message of generalMessages"
@@ -408,7 +408,7 @@
         <!-- Vision Results Section -->
         <div class="vision-results" *ngIf="visionMessages.length > 0">
           <h4>Analysis Results</h4>
-          <div class="vision-messages">
+          <div class="vision-messages" #visionMessagesContainer>
             <div 
               class="vision-message"
               *ngFor="let message of visionMessages; let i = index"

@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewChild, ElementRef, AfterViewChecked } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
@@ -25,6 +25,11 @@ interface VisionMessage {
   styleUrl: './dashboard.component.css'
 })
 export class DashboardComponent implements OnInit {
+  // ViewChild references for auto-scroll
+  @ViewChild('ragMessagesContainer') ragMessagesContainer!: ElementRef;
+  @ViewChild('generalMessagesContainer') generalMessagesContainer!: ElementRef;
+  @ViewChild('visionMessagesContainer') visionMessagesContainer!: ElementRef;
+
   // Document Management
   documents: DocumentData[] = [];
   selectedDocument: DocumentData | null = null;
@@ -65,6 +70,31 @@ export class DashboardComponent implements OnInit {
     private authService: AuthService,
     private globalModelSelection: GlobalModelSelectionService
   ) {}
+
+  private scrollToBottom(container: ElementRef, smooth: boolean = true) {
+    try {
+      const element = container.nativeElement;
+      const scrollOptions: ScrollToOptions = {
+        top: element.scrollHeight,
+        behavior: smooth ? 'smooth' : 'auto'
+      };
+      element.scrollTo(scrollOptions);
+    } catch (error) {
+      // Fallback for browsers that don't support smooth scrolling
+      try {
+        const element = container.nativeElement;
+        element.scrollTop = element.scrollHeight;
+      } catch (fallbackError) {
+        console.debug('Auto-scroll failed:', fallbackError);
+      }
+    }
+  }
+
+  private scrollToBottomAfterDelay(container: ElementRef, delay: number = 100) {
+    setTimeout(() => {
+      this.scrollToBottom(container);
+    }, delay);
+  }
 
   ngOnInit() {
     this.loadUserData();
@@ -201,6 +231,10 @@ export class DashboardComponent implements OnInit {
     this.currentSession = session;
     try {
       this.messages = await this.chatService.getSessionMessages(session.id!);
+      // Scroll to bottom to show latest messages after loading
+      if (this.messages.length > 0) {
+        this.scrollToBottomAfterDelay(this.ragMessagesContainer, 200);
+      }
     } catch (error) {
       console.error('Error loading messages:', error);
     }
@@ -222,6 +256,9 @@ export class DashboardComponent implements OnInit {
       createdAt: new Date()
     };
     this.messages.push(userMessage);
+    
+    // Scroll to show the user message
+    this.scrollToBottomAfterDelay(this.ragMessagesContainer);
 
     try {
       // Check if this is the first message in the session (excluding the user message we just added)
@@ -252,6 +289,9 @@ export class DashboardComponent implements OnInit {
       // Replace or add the assistant message
       this.messages.push(response);
       
+      // Scroll to show the assistant response
+      this.scrollToBottomAfterDelay(this.ragMessagesContainer);
+      
     } catch (error) {
       console.error('Error sending message:', error);
       // Add error message
@@ -260,6 +300,9 @@ export class DashboardComponent implements OnInit {
         content: 'Sorry, there was an error processing your message. Please try again.',
         createdAt: new Date()
       });
+      
+      // Scroll to show the error message
+      this.scrollToBottomAfterDelay(this.ragMessagesContainer);
     } finally {
       this.sending = false;
     }
@@ -289,6 +332,9 @@ export class DashboardComponent implements OnInit {
       createdAt: new Date()
     };
     this.generalMessages.push(userMessage);
+    
+    // Scroll to show the user message
+    this.scrollToBottomAfterDelay(this.generalMessagesContainer);
 
     try {
       // Use chat service for general conversation (no document context)
@@ -299,6 +345,9 @@ export class DashboardComponent implements OnInit {
       
       this.generalMessages.push(response);
       
+      // Scroll to show the assistant response
+      this.scrollToBottomAfterDelay(this.generalMessagesContainer);
+      
     } catch (error) {
       console.error('Error sending general message:', error);
       this.generalMessages.push({
@@ -306,6 +355,9 @@ export class DashboardComponent implements OnInit {
         content: 'Sorry, there was an error processing your message. Please try again.',
         createdAt: new Date()
       });
+      
+      // Scroll to show the error message
+      this.scrollToBottomAfterDelay(this.generalMessagesContainer);
     } finally {
       this.sendingGeneral = false;
     }
@@ -409,6 +461,9 @@ export class DashboardComponent implements OnInit {
       createdAt: new Date()
     };
     this.visionMessages.push(userMessage);
+    
+    // Scroll to show the user message
+    this.scrollToBottomAfterDelay(this.visionMessagesContainer);
 
     try {
       // Use the chat service to send vision message
@@ -426,6 +481,9 @@ export class DashboardComponent implements OnInit {
       };
       this.visionMessages.push(assistantMessage);
       
+      // Scroll to show the assistant response
+      this.scrollToBottomAfterDelay(this.visionMessagesContainer);
+      
       // Clear the prompt for next use
       this.visionPrompt = '';
       
@@ -437,6 +495,9 @@ export class DashboardComponent implements OnInit {
         content: 'Sorry, there was an error analyzing your image. Please try again.',
         createdAt: new Date()
       });
+      
+      // Scroll to show the error message
+      this.scrollToBottomAfterDelay(this.visionMessagesContainer);
     } finally {
       this.sendingVision = false;
     }
