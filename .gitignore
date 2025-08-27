@@ -21,8 +21,11 @@ dist/
 .claude/
 .firebase/
 functions/lib/shared/config/models.config.json
+emulator_data/
 
-
+#Functions
+functions/lib/index.js
+functions/lib/index.js.map
 
 
 # Runtime data
