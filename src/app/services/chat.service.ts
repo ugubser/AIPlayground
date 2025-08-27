@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { Firestore, collection, doc, addDoc, getDocs, query, where, orderBy, Timestamp } from '@angular/fire/firestore';
+import { Firestore, collection, doc, addDoc, getDocs, query, where, orderBy, Timestamp, updateDoc } from '@angular/fire/firestore';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { Auth } from '@angular/fire/auth';
 import { DynamicModelSelection } from './models-config.service';
@@ -9,6 +9,7 @@ export interface ChatSession {
   uid: string;
   title: string;
   createdAt: Date;
+  associatedDocuments?: string[]; // Array of document IDs
 }
 
 export interface ChatMessage {
@@ -58,7 +59,7 @@ export class ChatService {
     private auth: Auth
   ) { }
 
-  async createSession(title?: string): Promise<string> {
+  async createSession(title?: string, associatedDocuments?: string[]): Promise<string> {
     if (!this.auth.currentUser) {
       throw new Error('User not authenticated');
     }
@@ -67,7 +68,8 @@ export class ChatService {
     const sessionData: Omit<ChatSession, 'id'> = {
       uid,
       title: title || `Chat ${new Date().toLocaleString()}`,
-      createdAt: new Date()
+      createdAt: new Date(),
+      associatedDocuments: associatedDocuments || []
     };
 
     const sessionRef = await addDoc(collection(this.firestore, 'sessions'), sessionData);
@@ -113,8 +115,6 @@ export class ChatService {
       throw new Error('User not authenticated');
     }
 
-    const uid = this.auth.currentUser.uid;
-
     // Save user message
     const userMessage: Omit<ChatMessage, 'id'> = {
       role: 'user',
@@ -122,7 +122,7 @@ export class ChatService {
       createdAt: new Date()
     };
 
-    const userMessageRef = await addDoc(
+    await addDoc(
       collection(this.firestore, `sessions/${sessionId}/messages`),
       userMessage
     );
@@ -296,5 +296,38 @@ export class ChatService {
       reader.onerror = reject;
       reader.readAsDataURL(file);
     });
+  }
+
+  async updateSessionDocuments(sessionId: string, documentIds: string[]): Promise<void> {
+    const sessionRef = doc(this.firestore, `sessions/${sessionId}`);
+    await updateDoc(sessionRef, { associatedDocuments: documentIds });
+  }
+
+  async addDocumentToSession(sessionId: string, documentId: string): Promise<void> {
+    const sessionRef = doc(this.firestore, `sessions/${sessionId}`);
+    const sessionDoc = await getDocs(query(collection(this.firestore, 'sessions'), where('__name__', '==', sessionId)));
+    
+    if (!sessionDoc.empty) {
+      const currentSession = sessionDoc.docs[0].data() as ChatSession;
+      const currentDocs = currentSession.associatedDocuments || [];
+      
+      if (!currentDocs.includes(documentId)) {
+        const updatedDocs = [...currentDocs, documentId];
+        await updateDoc(sessionRef, { associatedDocuments: updatedDocs });
+      }
+    }
+  }
+
+  async removeDocumentFromSession(sessionId: string, documentId: string): Promise<void> {
+    const sessionRef = doc(this.firestore, `sessions/${sessionId}`);
+    const sessionDoc = await getDocs(query(collection(this.firestore, 'sessions'), where('__name__', '==', sessionId)));
+    
+    if (!sessionDoc.empty) {
+      const currentSession = sessionDoc.docs[0].data() as ChatSession;
+      const currentDocs = currentSession.associatedDocuments || [];
+      
+      const updatedDocs = currentDocs.filter(docId => docId !== documentId);
+      await updateDoc(sessionRef, { associatedDocuments: updatedDocs });
+    }
   }
 }

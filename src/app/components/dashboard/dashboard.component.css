@@ -962,6 +962,207 @@
   font-size: 0.8rem;
 }
 
+.doc-model {
+  color: var(--color-text-secondary);
+  font-size: 0.65rem;
+  margin-top: 0.25rem;
+}
+
+.doc-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.btn-danger {
+  background: var(--color-error);
+  color: white;
+  border: 1px solid var(--color-error);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: var(--color-error-hover);
+  border-color: var(--color-error-hover);
+}
+
+.btn-danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-small {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  min-width: auto;
+}
+
+.session-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.session-documents h4 {
+  margin: 0 0 var(--space-2) 0;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.session-doc-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.session-doc-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0.25rem 0.5rem;
+  background: var(--color-primary-subtle);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  color: var(--color-primary);
+}
+
+.session-doc-badge.incompatible-badge {
+  background: var(--color-warning-subtle);
+  border-color: var(--color-warning);
+  color: var(--color-warning);
+}
+
+.incompatible-warning {
+  color: var(--color-warning);
+  font-size: 0.8rem;
+}
+
+.remove-doc-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-error);
+  font-size: 0.9rem;
+  font-weight: bold;
+  padding: 0;
+  margin-left: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  transition: background-color var(--transition-fast);
+}
+
+.remove-doc-btn:hover {
+  background: var(--color-error);
+  color: white;
+}
+
+.add-documents-section {
+  position: relative;
+}
+
+.add-documents-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  z-index: 10;
+  max-height: 200px;
+  overflow-y: auto;
+  margin-top: var(--space-1);
+}
+
+.add-doc-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.add-doc-item:hover {
+  background: var(--color-surface-hover);
+}
+
+.add-doc-item .doc-name {
+  flex: 1;
+  font-size: 0.8rem;
+  color: var(--color-text-primary);
+}
+
+.add-doc-btn {
+  color: var(--color-primary);
+  font-size: 1.2rem;
+  font-weight: bold;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-secondary {
+  background: var(--color-gray-100);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--color-gray-200);
+  border-color: var(--color-primary);
+}
+
+/* Upload area disabled state */
+.upload-area.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: var(--color-gray-50);
+}
+
+.upload-area.disabled .upload-content {
+  pointer-events: none;
+}
+
+.disabled-text {
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
+/* Document compatibility indicators */
+.document-item.compatible {
+  border-left: 3px solid var(--color-success);
+}
+
+.document-item.incompatible {
+  border-left: 3px solid var(--color-warning);
+  background: var(--color-warning-subtle);
+}
+
+.compatibility-indicator {
+  margin-left: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.doc-model {
+  display: flex;
+  align-items: center;
+  color: var(--color-text-secondary);
+  font-size: 0.65rem;
+  margin-top: 0.25rem;
+}
+
 /* General Chat Container */
 .general-chat-container {
   height: 100%;

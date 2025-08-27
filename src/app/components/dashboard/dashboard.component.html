@@ -32,21 +32,27 @@
           <div class="upload-area" 
                [class.drag-over]="dragOver"
                [class.uploading]="uploading"
-               (dragover)="onDragOver($event)"
-               (dragleave)="onDragLeave($event)"
-               (drop)="onDrop($event)">
+               [class.disabled]="!currentSession"
+               (dragover)="currentSession ? onDragOver($event) : null"
+               (dragleave)="currentSession ? onDragLeave($event) : null"
+               (drop)="currentSession ? onDrop($event) : null">
             
             <div class="upload-content" *ngIf="!uploading">
               <div class="upload-icon">📤</div>
               <h4>Upload PDF</h4>
-              <p>Drag & drop or click to select</p>
+              <p *ngIf="currentSession">Drag & drop or click to select</p>
+              <p *ngIf="!currentSession" class="disabled-text">Create a session first to upload documents</p>
               <input 
                 type="file" 
                 accept="application/pdf" 
                 (change)="onFileSelect($event)"
                 #fileInput
-                style="display: none">
-              <button class="btn btn-primary btn-small" (click)="fileInput.click()">
+                style="display: none"
+                [disabled]="!currentSession">
+              <button 
+                class="btn btn-primary btn-small" 
+                (click)="currentSession ? fileInput.click() : null"
+                [disabled]="!currentSession">
                 Choose File
               </button>
             </div>
@@ -81,15 +87,17 @@
 
         <!-- Documents List -->
         <div class="documents-section">
-          <h4>Your Documents ({{ documents.length }})</h4>
+          <h4>Session Documents ({{ getSessionDocuments().length }})</h4>
           
-          <div class="document-list" *ngIf="documents.length > 0">
+          <div class="document-list" *ngIf="getSessionDocuments().length > 0">
             <div 
               class="document-item" 
-              *ngFor="let doc of documents"
+              *ngFor="let doc of getSessionDocuments()"
               [class.selected]="selectedDocument?.id === doc.id"
               [class.processing]="doc.status === 'processing'"
               [class.error]="doc.status === 'error'"
+              [class.compatible]="isDocumentCompatible(doc)"
+              [class.incompatible]="!isDocumentCompatible(doc)"
               (click)="selectDocument(doc)">
               
               <div class="doc-icon">
@@ -101,25 +109,48 @@
               <div class="doc-info">
                 <div class="doc-name">{{ doc.filename }}</div>
                 <div class="doc-status" [class]="doc.status">{{ doc.status }}</div>
+                <div class="doc-model" *ngIf="doc.embedModel">
+                  <small>{{ doc.embedModel.provider }}/{{ doc.embedModel.model }}</small>
+                  <span class="compatibility-indicator" *ngIf="!isDocumentCompatible(doc)" title="Incompatible embedding model">⚠️</span>
+                  <span class="compatibility-indicator" *ngIf="isDocumentCompatible(doc)" title="Compatible embedding model">✅</span>
+                </div>
+              </div>
+              
+              <div class="doc-actions">
+                <button 
+                  class="btn btn-small btn-danger" 
+                  (click)="deleteDocument(doc); $event.stopPropagation()"
+                  [disabled]="deleting === doc.id"
+                  title="Delete document">
+                  <span *ngIf="deleting !== doc.id">🗑️</span>
+                  <span *ngIf="deleting === doc.id">⏳</span>
+                </button>
               </div>
             </div>
           </div>
 
-          <div class="empty-docs" *ngIf="documents.length === 0 && !uploading">
-            <p>No documents yet</p>
+          <div class="empty-docs" *ngIf="getSessionDocuments().length === 0 && !uploading && currentSession">
+            <p>No documents in this session yet</p>
+            <p><small>Upload a document above to get started</small></p>
+          </div>
+          
+          <div class="empty-docs" *ngIf="!currentSession">
+            <p>No session selected</p>
+            <p><small>Create or select a session first</small></p>
           </div>
         </div>
 
         <!-- Document Filter -->
-        <div class="document-filter" *ngIf="documents.length > 0">
+        <div class="document-filter" *ngIf="getSessionDocuments().length > 0">
           <h4>Filter by Document</h4>
           <select class="doc-select" [(ngModel)]="selectedDocument">
-            <option [ngValue]="null">All documents</option>
+            <option [ngValue]="null">All session documents</option>
             <option 
-              *ngFor="let doc of documents" 
+              *ngFor="let doc of getSessionDocuments()" 
               [ngValue]="doc"
               [disabled]="doc.status !== 'completed'">
               {{ doc.filename }}
+              <span *ngIf="!isDocumentCompatible(doc)"> (⚠️ incompatible)</span>
             </option>
           </select>
         </div>
@@ -129,8 +160,42 @@
       <main class="rag-main">
         <div class="chat-header" *ngIf="currentSession">
           <h2>{{ currentSession.title }}</h2>
-          <div class="chat-info" *ngIf="selectedDocument">
-            <span class="document-badge">📄 {{ selectedDocument.filename }}</span>
+          <div class="session-info">
+            <div class="session-documents" *ngIf="currentSession.associatedDocuments && currentSession.associatedDocuments.length > 0">
+              <h4>Active in this Session:</h4>
+              <div class="session-doc-list">
+                <span 
+                  *ngFor="let docId of currentSession.associatedDocuments; let i = index" 
+                  class="session-doc-badge"
+                  [class.incompatible-badge]="!isDocumentByIdCompatible(docId)">
+                  📄 {{ getDocumentName(docId) }}
+                  <span *ngIf="!isDocumentByIdCompatible(docId)" class="incompatible-warning" title="Incompatible embedding model">⚠️</span>
+                  <button 
+                    class="remove-doc-btn" 
+                    (click)="removeDocumentFromCurrentSession(docId)"
+                    title="Remove from session">×</button>
+                </span>
+              </div>
+            </div>
+            <div class="add-documents-section">
+              <button 
+                class="btn btn-small btn-secondary" 
+                (click)="showAddDocuments = !showAddDocuments">
+                {{ showAddDocuments ? 'Hide' : 'Add' }} Documents to Session
+              </button>
+              <div class="add-documents-list" *ngIf="showAddDocuments">
+                <div 
+                  *ngFor="let doc of getAvailableDocuments()" 
+                  class="add-doc-item"
+                  (click)="addDocumentToCurrentSession(doc.id!)">
+                  <span class="doc-name">{{ doc.filename }}</span>
+                  <span class="add-doc-btn">+</span>
+                </div>
+              </div>
+            </div>
+            <div class="chat-info" *ngIf="selectedDocument">
+              <span class="document-badge">📄 {{ selectedDocument.filename }}</span>
+            </div>
           </div>
         </div>
 

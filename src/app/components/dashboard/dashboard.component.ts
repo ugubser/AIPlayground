@@ -30,6 +30,7 @@ export class DashboardComponent implements OnInit {
   selectedDocument: DocumentData | null = null;
   uploading = false;
   uploadProgress = '';
+  deleting: string | null = null;
 
   // RAG Chat (document-based)
   sessions: ChatSession[] = [];
@@ -46,6 +47,7 @@ export class DashboardComponent implements OnInit {
   // UI State
   activeTab: 'rag' | 'chat' | 'vision' = 'rag';
   dragOver = false;
+  showAddDocuments = false;
 
   // Vision functionality
   selectedImage: { url: string; name: string; size: number; file: File } | null = null;
@@ -137,6 +139,12 @@ export class DashboardComponent implements OnInit {
 
       // 4. Update document status
       await this.documentService.updateDocumentStatus(docId, 'completed', chunks.length);
+
+      // 5. Associate document with current session if one exists
+      if (this.currentSession?.id) {
+        await this.chatService.addDocumentToSession(this.currentSession.id, docId);
+        console.log(`Associated document ${docId} with session ${this.currentSession.id}`);
+      }
 
       this.uploadProgress = 'Complete!';
       
@@ -399,5 +407,125 @@ export class DashboardComponent implements OnInit {
     } finally {
       this.sendingVision = false;
     }
+  }
+
+  async deleteDocument(doc: DocumentData) {
+    if (!doc.id || this.deleting) {
+      return;
+    }
+
+    const confirmed = confirm(`Are you sure you want to delete "${doc.filename}"? This will remove the document and all its associated data permanently.`);
+    if (!confirmed) {
+      return;
+    }
+
+    this.deleting = doc.id;
+
+    try {
+      await this.documentService.deleteDocument(doc.id);
+      
+      // Remove from local documents list
+      this.documents = this.documents.filter(d => d.id !== doc.id);
+      
+      // Clear selection if this document was selected
+      if (this.selectedDocument?.id === doc.id) {
+        this.selectedDocument = null;
+      }
+      
+      // Refresh data to ensure consistency
+      await this.loadUserData();
+      
+    } catch (error) {
+      console.error('Error deleting document:', error);
+      alert('Failed to delete document. Please try again.');
+    } finally {
+      this.deleting = null;
+    }
+  }
+
+  getDocumentName(docId: string): string {
+    const doc = this.documents.find(d => d.id === docId);
+    return doc ? doc.filename : 'Unknown Document';
+  }
+
+  getAvailableDocuments(): DocumentData[] {
+    if (!this.currentSession) return [];
+    
+    const associatedIds = this.currentSession.associatedDocuments || [];
+    return this.documents.filter(doc => 
+      doc.status === 'completed' && 
+      !associatedIds.includes(doc.id!)
+    );
+  }
+
+  async addDocumentToCurrentSession(docId: string) {
+    if (!this.currentSession?.id) return;
+
+    try {
+      await this.chatService.addDocumentToSession(this.currentSession.id, docId);
+      
+      // Update local session
+      if (!this.currentSession.associatedDocuments) {
+        this.currentSession.associatedDocuments = [];
+      }
+      this.currentSession.associatedDocuments.push(docId);
+      
+      // Refresh sessions to ensure consistency
+      await this.loadUserData();
+      
+    } catch (error) {
+      console.error('Error adding document to session:', error);
+      alert('Failed to add document to session. Please try again.');
+    }
+  }
+
+  async removeDocumentFromCurrentSession(docId: string) {
+    if (!this.currentSession?.id) return;
+
+    try {
+      await this.chatService.removeDocumentFromSession(this.currentSession.id, docId);
+      
+      // Update local session
+      if (this.currentSession.associatedDocuments) {
+        this.currentSession.associatedDocuments = 
+          this.currentSession.associatedDocuments.filter(id => id !== docId);
+      }
+      
+      // Refresh sessions to ensure consistency
+      await this.loadUserData();
+      
+    } catch (error) {
+      console.error('Error removing document from session:', error);
+      alert('Failed to remove document from session. Please try again.');
+    }
+  }
+
+  getSessionDocuments(): DocumentData[] {
+    if (!this.currentSession) return [];
+    
+    const sessionDocIds = this.currentSession.associatedDocuments || [];
+    return this.documents.filter(doc => sessionDocIds.includes(doc.id!));
+  }
+
+  isDocumentCompatible(doc: DocumentData): boolean {
+    // If document doesn't have embedModel metadata, assume compatible for backward compatibility
+    if (!doc.embedModel) return true;
+    
+    const currentSelection = this.globalModelSelection.getCurrentSelection();
+    const currentEmbedModel = currentSelection?.['embed'];
+    
+    if (!currentEmbedModel) return true;
+    
+    return doc.embedModel.provider === currentEmbedModel.provider && 
+           doc.embedModel.model === currentEmbedModel.model;
+  }
+
+  getDocumentById(docId: string): DocumentData | null {
+    return this.documents.find(doc => doc.id === docId) || null;
+  }
+
+  isDocumentByIdCompatible(docId: string): boolean {
+    const doc = this.getDocumentById(docId);
+    return doc ? this.isDocumentCompatible(doc) : false;
   }
 }

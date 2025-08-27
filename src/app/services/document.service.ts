@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { Firestore, collection, doc, setDoc, addDoc, updateDoc, getDocs, query, where, orderBy } from '@angular/fire/firestore';
+import { Firestore, collection, doc, addDoc, updateDoc, getDocs, query, where, orderBy } from '@angular/fire/firestore';
 import { Storage, ref, uploadBytes, getDownloadURL } from '@angular/fire/storage';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { Auth } from '@angular/fire/auth';
@@ -15,6 +15,10 @@ export interface DocumentData {
   status: 'processing' | 'completed' | 'error';
   createdAt: Date;
   uploadUrl?: string;
+  embedModel?: {
+    provider: string;
+    model: string;
+  };
 }
 
 export interface ChunkWithEmbedding extends ChunkData {
@@ -22,6 +26,10 @@ export interface ChunkWithEmbedding extends ChunkData {
   docId: string;
   uid: string;
   embedding: number[];
+  embedModel?: {
+    provider: string;
+    model: string;
+  };
 }
 
 @Injectable({
@@ -52,6 +60,13 @@ export class DocumentService {
     await uploadBytes(storageRef, file);
     const uploadUrl = await getDownloadURL(storageRef);
 
+    // Get current embedding model selection
+    const modelSelection = this.globalModelSelection.getCurrentSelection();
+    const embedModel = modelSelection?.['embed'] ? {
+      provider: modelSelection['embed'].provider,
+      model: modelSelection['embed'].model
+    } : undefined;
+
     const documentData: DocumentData = {
       uid,
       filename: file.name,
@@ -59,7 +74,8 @@ export class DocumentService {
       pageCount: 0, // Will be updated after processing
       status: 'processing',
       createdAt: new Date(),
-      uploadUrl
+      uploadUrl,
+      embedModel
     };
 
     const docRef = await addDoc(collection(this.firestore, 'documents'), documentData);
@@ -98,7 +114,11 @@ export class DocumentService {
             ...chunk,
             docId,
             uid,
-            embedding: data.vectors[index] || []
+            embedding: data.vectors[index] || [],
+            embedModel: modelSelection?.['embed'] ? {
+              provider: modelSelection['embed'].provider,
+              model: modelSelection['embed'].model
+            } : undefined
           };
           
           return addDoc(chunksCollection, chunkWithEmbedding);
@@ -142,5 +162,14 @@ export class DocumentService {
         createdAt: data['createdAt']?.toDate ? data['createdAt'].toDate() : new Date(data['createdAt'])
       } as DocumentData;
     });
+  }
+
+  async deleteDocument(docId: string): Promise<void> {
+    if (!this.auth.currentUser) {
+      throw new Error('User not authenticated');
+    }
+
+    const deleteDoc = httpsCallable<{docId: string}, {success: boolean}>(this.functions, 'deleteDocument');
+    await deleteDoc({ docId });
   }
 }

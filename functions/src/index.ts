@@ -181,6 +181,22 @@ export const chatRag = functions
     try {
       console.log(`Processing RAG query for user ${uid}: "${message.substring(0, 100)}..." using LLM: ${actualLlmProvider}/${actualLlmModel}, Embed: ${actualEmbedProvider}/${actualEmbedModel}`);
 
+      // Get session details to check for associated documents
+      const sessionRef = db.collection('sessions').doc(sessionId);
+      const sessionSnapshot = await sessionRef.get();
+      
+      if (!sessionSnapshot.exists) {
+        throw new functions.https.HttpsError('not-found', 'Session not found');
+      }
+
+      const sessionData = sessionSnapshot.data();
+      if (sessionData?.uid !== uid) {
+        throw new functions.https.HttpsError('permission-denied', 'Access denied');
+      }
+
+      const sessionDocuments = sessionData.associatedDocuments || [];
+      console.log(`Session ${sessionId} has ${sessionDocuments.length} associated documents:`, sessionDocuments);
+
       // 1) Embed the query
       // Validate embed provider supports embeddings
       if (!modelsConfigService.supportsEmbeddings(actualEmbedProvider)) {
@@ -251,10 +267,11 @@ export const chatRag = functions
 
       // 2) Retrieve top-K chunks (brute-force similarity search)
       console.log(`Searching for chunks with uid: ${uid}, restrictDocId: ${restrictDocId}`);
+      console.log(`Using embedding model: ${actualEmbedProvider}/${actualEmbedModel}`);
       
       let chunksSnapshot;
       try {
-        // Try simple query first if restrictDocId is provided
+        // Priority 1: If restrictDocId is provided, use only that document
         if (restrictDocId) {
           console.log(`Trying compound query: uid=${uid}, docId=${restrictDocId}`);
           let chunksQuery = db.collectionGroup('chunks')
@@ -265,8 +282,39 @@ export const chatRag = functions
           console.log('About to execute compound chunks query...');
           chunksSnapshot = await chunksQuery.get();
           console.log('Compound chunks query executed successfully');
-        } else {
-          console.log(`Trying simple query: uid=${uid}`);
+        }
+        // Priority 2: If session has associated documents, use only those
+        else if (sessionDocuments.length > 0) {
+          console.log(`Using session-associated documents: ${sessionDocuments.join(', ')}`);
+          
+          // For multiple documents, we need to query each one separately and combine results
+          const chunkPromises = sessionDocuments.map((docId: string) => 
+            db.collectionGroup('chunks')
+              .where('uid', '==', uid)
+              .where('docId', '==', docId)
+              .limit(1000)
+              .get()
+          );
+          
+          const chunkSnapshots = await Promise.all(chunkPromises);
+          
+          // Combine all chunks from all session documents
+          const allDocs: any[] = [];
+          chunkSnapshots.forEach(snapshot => {
+            snapshot.docs.forEach((doc: any) => allDocs.push(doc));
+          });
+          
+          // Create a fake snapshot object for compatibility
+          chunksSnapshot = { 
+            empty: allDocs.length === 0,
+            docs: allDocs
+          };
+          
+          console.log(`Found chunks from ${chunkSnapshots.length} session documents`);
+        }
+        // Priority 3: Fall back to all user documents (backward compatibility)
+        else {
+          console.log(`Trying simple query: uid=${uid} (all documents)`);
           let chunksQuery = db.collectionGroup('chunks')
             .where('uid', '==', uid)
             .limit(5000);
@@ -293,10 +341,33 @@ export const chatRag = functions
         ...doc.data()
       }));
 
-      console.log(`Found ${allChunks.length} chunks to search through`);
+      console.log(`Found ${allChunks.length} chunks before filtering`);
 
-      // Calculate similarity scores and get top-K
-      const scoredChunks = allChunks
+      // Filter chunks to only include those with compatible embedding models
+      const compatibleChunks = allChunks.filter((chunk: any) => {
+        const chunkEmbedModel = chunk.embedModel;
+        
+        // If chunk doesn't have embedModel metadata, include it for backward compatibility
+        if (!chunkEmbedModel) {
+          console.log(`Including chunk ${chunk.id} (no embedModel metadata - backward compatibility)`);
+          return true;
+        }
+        
+        // Only include chunks that were embedded with the same model we're using for the query
+        const isCompatible = chunkEmbedModel.provider === actualEmbedProvider && 
+                             chunkEmbedModel.model === actualEmbedModel;
+        
+        if (!isCompatible) {
+          console.log(`Excluding chunk ${chunk.id}: embedModel mismatch (chunk: ${chunkEmbedModel.provider}/${chunkEmbedModel.model}, query: ${actualEmbedProvider}/${actualEmbedModel})`);
+        }
+        
+        return isCompatible;
+      });
+
+      console.log(`Found ${compatibleChunks.length} compatible chunks to search through`);
+
+      // Calculate similarity scores and get top-K from compatible chunks
+      const scoredChunks = compatibleChunks
         .map((chunk: any) => ({
           chunk,
           score: cosine(queryVector, chunk.embedding || [])
@@ -305,6 +376,11 @@ export const chatRag = functions
         .slice(0, k);
 
       if (scoredChunks.length === 0) {
+        if (allChunks.length > 0) {
+          return { 
+            answer: `I found ${allChunks.length} document chunks, but none were embedded with the same model you're currently using (${actualEmbedProvider}/${actualEmbedModel}). Please re-upload your documents or switch to a compatible embedding model.` 
+          };
+        }
         return { 
           answer: "I couldn't find any relevant information to answer your question." 
         };
@@ -645,5 +721,96 @@ export const visionChat = functions
         throw error;
       }
       throw new functions.https.HttpsError('internal', 'Failed to process vision request');
+    }
+  });
+
+export const deleteDocument = functions
+  .runWith({ timeoutSeconds: 60, memory: '1GB' })
+  .https.onCall(async (data, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError('unauthenticated', 'Login required');
+    }
+
+    const { docId } = data;
+    
+    if (!docId) {
+      throw new functions.https.HttpsError('invalid-argument', 'docId required');
+    }
+
+    const uid = context.auth.uid;
+
+    try {
+      console.log(`Deleting document ${docId} for user ${uid}`);
+
+      // 1) Verify document belongs to user
+      const docRef = db.collection('documents').doc(docId);
+      const docSnapshot = await docRef.get();
+      
+      if (!docSnapshot.exists) {
+        throw new functions.https.HttpsError('not-found', 'Document not found');
+      }
+
+      const docData = docSnapshot.data();
+      if (docData?.uid !== uid) {
+        throw new functions.https.HttpsError('permission-denied', 'Access denied');
+      }
+
+      console.log(`Document verified: ${docData.filename}`);
+
+      // 2) Delete all chunks
+      const chunksQuery = db.collection(`documents/${docId}/chunks`);
+      const chunksSnapshot = await chunksQuery.get();
+      
+      console.log(`Found ${chunksSnapshot.docs.length} chunks to delete`);
+      
+      const chunkDeletions = chunksSnapshot.docs.map(chunkDoc => chunkDoc.ref.delete());
+      await Promise.all(chunkDeletions);
+
+      console.log('All chunks deleted');
+
+      // 3) Delete the file from Storage (if bucketPath exists)
+      if (docData.bucketPath) {
+        try {
+          const bucket = admin.storage().bucket();
+          await bucket.file(docData.bucketPath).delete();
+          console.log(`Storage file deleted: ${docData.bucketPath}`);
+        } catch (storageError) {
+          console.warn('Failed to delete storage file (may not exist):', storageError);
+          // Continue with deletion even if storage file doesn't exist
+        }
+      }
+
+      // 4) Remove document from all sessions that reference it
+      const sessionsQuery = db.collection('sessions')
+        .where('uid', '==', uid)
+        .where('associatedDocuments', 'array-contains', docId);
+      
+      const sessionsSnapshot = await sessionsQuery.get();
+      
+      if (!sessionsSnapshot.empty) {
+        console.log(`Removing document from ${sessionsSnapshot.docs.length} sessions`);
+        
+        const sessionUpdates = sessionsSnapshot.docs.map(sessionDoc => {
+          const sessionData = sessionDoc.data();
+          const updatedDocs = (sessionData.associatedDocuments || []).filter((id: string) => id !== docId);
+          return sessionDoc.ref.update({ associatedDocuments: updatedDocs });
+        });
+        
+        await Promise.all(sessionUpdates);
+      }
+
+      // 5) Delete the document record
+      await docRef.delete();
+
+      console.log(`Document ${docId} completely deleted`);
+
+      return { success: true };
+
+    } catch (error) {
+      console.error('Error in deleteDocument:', error);
+      if (error instanceof functions.https.HttpsError) {
+        throw error;
+      }
+      throw new functions.https.HttpsError('internal', 'Failed to delete document');
     }
   });
