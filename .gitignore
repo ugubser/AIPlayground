@@ -26,6 +26,8 @@ emulator_data/
 #Functions
 functions/lib/index.js
 functions/lib/index.js.map
+functions/lib/models.config.json
+functions/src/models.config.json
 
 
 # Runtime data

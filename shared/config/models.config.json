@@ -2,12 +2,12 @@
   "rag": {
     "LLM": {
       "openrouter.ai": [
-        "openai/gpt-oss-20b:free",
-        "z-ai/glm-4.5-air:free",
         "meta-llama/llama-4-maverick:free",
+        "z-ai/glm-4.5-air:free",
         "qwen/qwen3-coder:free",
         "moonshotai/kimi-k2:free",
-        "google/gemma-3n-e2b-it:free"
+        "google/gemma-3n-e2b-it:free",
+        "openai/gpt-oss-20b:free"
       ],
       "together.ai": [
         "deepseek-ai/DeepSeek-R1-Distill-Llama-70B-free",
@@ -17,9 +17,10 @@
     },
     "EMBED": {
       "together.ai": [
+        "intfloat/multilingual-e5-large-instruct",
         "BAAI/bge-base-en-v1.5",
-        "BAAI/bge-large-en-v1.5",
-        "intfloat/multilingual-e5-large-instruct"
+        "BAAI/bge-large-en-v1.5"
+        
       ],
       "ollama": [
         "bge-m3"
@@ -29,12 +30,13 @@
   "chat": {
     "LLM": {
       "openrouter.ai": [
-        "openai/gpt-oss-20b:free",
         "z-ai/glm-4.5-air:free",
         "meta-llama/llama-4-maverick:free",
         "qwen/qwen3-coder:free",
         "moonshotai/kimi-k2:free",
-        "google/gemma-3n-e2b-it:free"
+        "google/gemma-3n-e2b-it:free",
+        "openai/gpt-oss-20b:free"
+
       ],
       "together.ai": [
         "deepseek-ai/DeepSeek-R1-Distill-Llama-70B-free",
