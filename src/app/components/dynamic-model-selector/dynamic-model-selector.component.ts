@@ -46,45 +46,46 @@ import { ModelsConfigService, DynamicModelSelection } from '../../services/model
     .compact-row {
       display: flex;
       align-items: center;
-      gap: var(--space-3);
-      flex-wrap: wrap;
+      gap: var(--space-4);
+      flex-wrap: nowrap;
+      width: 100%;
     }
 
     .model-group-compact {
       display: flex;
       align-items: center;
-      gap: var(--space-1);
+      gap: var(--space-2);
       flex: 1;
-      min-width: 180px;
+      min-width: 200px;
     }
 
     .model-group-compact label {
-      font-size: 0.6875rem;
+      font-size: 0.75rem;
       font-weight: var(--font-weight-semibold);
       color: var(--color-text-secondary);
       text-transform: uppercase;
       letter-spacing: 0.05em;
-      min-width: 35px;
+      min-width: 45px;
       flex-shrink: 0;
     }
 
     select {
       flex: 1;
-      padding: var(--space-1) var(--space-2);
+      padding: var(--space-2) var(--space-3);
       border: 1px solid var(--color-border);
       border-radius: var(--radius-md);
-      font-size: 0.75rem;
+      font-size: 0.8125rem;
       font-family: var(--font-family-primary);
       background: var(--color-surface-elevated);
       color: var(--color-text-primary);
-      min-width: 100px;
+      min-width: 120px;
       transition: all var(--transition-fast);
       appearance: none;
       background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23b3b3b3' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
-      background-position: right var(--space-1) center;
+      background-position: right var(--space-2) center;
       background-repeat: no-repeat;
-      background-size: 0.875rem;
-      padding-right: var(--space-6);
+      background-size: 1rem;
+      padding-right: var(--space-7);
       box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
     }
 
@@ -148,19 +149,14 @@ import { ModelsConfigService, DynamicModelSelection } from '../../services/model
       box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.2);
     }
 
-    @media (max-width: 900px) {
+    @media (max-width: 1024px) {
       .compact-row {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
         gap: var(--space-3);
-        align-items: stretch;
+        flex-wrap: wrap;
       }
-
-      .reset-btn-compact {
-        grid-column: 1 / -1;
-        justify-self: center;
-        width: auto;
-        padding: var(--space-2) var(--space-4);
+      
+      .model-group-compact {
+        min-width: 180px;
       }
     }
 
