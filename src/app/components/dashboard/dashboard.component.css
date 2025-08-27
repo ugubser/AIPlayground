@@ -321,12 +321,16 @@
 }
 
 .session-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: var(--space-4);
   border-radius: var(--radius-md);
   cursor: pointer;
   margin-bottom: var(--space-1);
   transition: all var(--transition-fast);
   border: 1px solid transparent;
+  gap: var(--space-2);
 }
 
 .session-item:hover {
@@ -355,6 +359,26 @@
   font-size: 0.75rem;
   color: var(--color-text-subtle);
   font-weight: var(--font-weight-regular);
+}
+
+.session-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.session-actions {
+  flex-shrink: 0;
+}
+
+.session-delete-btn {
+  padding: 0.2rem 0.4rem;
+  font-size: 0.7rem;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.session-item:hover .session-delete-btn {
+  opacity: 1;
 }
 
 .document-filter {

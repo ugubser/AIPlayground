@@ -814,3 +814,116 @@ export const deleteDocument = functions
       throw new functions.https.HttpsError('internal', 'Failed to delete document');
     }
   });
+
+export const deleteSession = functions
+  .runWith({ timeoutSeconds: 300, memory: '1GB' })
+  .https.onCall(async (data, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError('unauthenticated', 'Login required');
+    }
+
+    const { sessionId } = data;
+    
+    if (!sessionId) {
+      throw new functions.https.HttpsError('invalid-argument', 'sessionId required');
+    }
+
+    const uid = context.auth.uid;
+
+    try {
+      console.log(`Deleting session ${sessionId} for user ${uid}`);
+
+      // 1) Verify session belongs to user
+      const sessionRef = db.collection('sessions').doc(sessionId);
+      const sessionSnapshot = await sessionRef.get();
+      
+      if (!sessionSnapshot.exists) {
+        throw new functions.https.HttpsError('not-found', 'Session not found');
+      }
+
+      const sessionData = sessionSnapshot.data();
+      if (sessionData?.uid !== uid) {
+        throw new functions.https.HttpsError('permission-denied', 'Access denied');
+      }
+
+      console.log(`Session verified: ${sessionData.title}`);
+
+      // 2) Get associated documents
+      const associatedDocuments = sessionData.associatedDocuments || [];
+      console.log(`Found ${associatedDocuments.length} associated documents`);
+
+      // 3) Delete all associated documents (and their chunks/files)
+      for (const docId of associatedDocuments) {
+        try {
+          console.log(`Deleting associated document: ${docId}`);
+          
+          // Get document data
+          const docRef = db.collection('documents').doc(docId);
+          const docSnapshot = await docRef.get();
+          
+          if (!docSnapshot.exists) {
+            console.warn(`Document ${docId} not found, skipping`);
+            continue;
+          }
+
+          const docData = docSnapshot.data();
+          if (docData?.uid !== uid) {
+            console.warn(`Document ${docId} doesn't belong to user, skipping`);
+            continue;
+          }
+
+          // Delete chunks
+          const chunksQuery = db.collection(`documents/${docId}/chunks`);
+          const chunksSnapshot = await chunksQuery.get();
+          const chunkDeletions = chunksSnapshot.docs.map(chunkDoc => chunkDoc.ref.delete());
+          await Promise.all(chunkDeletions);
+          
+          console.log(`Deleted ${chunksSnapshot.docs.length} chunks for document ${docId}`);
+
+          // Delete storage file
+          if (docData.bucketPath) {
+            try {
+              const bucket = admin.storage().bucket();
+              await bucket.file(docData.bucketPath).delete();
+              console.log(`Storage file deleted: ${docData.bucketPath}`);
+            } catch (storageError) {
+              console.warn('Failed to delete storage file:', storageError);
+            }
+          }
+
+          // Delete document record
+          await docRef.delete();
+          console.log(`Document ${docId} deleted`);
+          
+        } catch (docError) {
+          console.error(`Error deleting document ${docId}:`, docError);
+          // Continue with other documents even if one fails
+        }
+      }
+
+      // 4) Delete all session messages
+      const messagesQuery = db.collection(`sessions/${sessionId}/messages`);
+      const messagesSnapshot = await messagesQuery.get();
+      
+      console.log(`Found ${messagesSnapshot.docs.length} messages to delete`);
+      
+      const messageDeletions = messagesSnapshot.docs.map(messageDoc => messageDoc.ref.delete());
+      await Promise.all(messageDeletions);
+
+      console.log('All messages deleted');
+
+      // 5) Delete the session record
+      await sessionRef.delete();
+
+      console.log(`Session ${sessionId} completely deleted`);
+
+      return { success: true };
+
+    } catch (error) {
+      console.error('Error in deleteSession:', error);
+      if (error instanceof functions.https.HttpsError) {
+        throw error;
+      }
+      throw new functions.https.HttpsError('internal', 'Failed to delete session');
+    }
+  });

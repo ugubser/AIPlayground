@@ -330,4 +330,18 @@ export class ChatService {
       await updateDoc(sessionRef, { associatedDocuments: updatedDocs });
     }
   }
+
+  async deleteSession(sessionId: string): Promise<void> {
+    if (!this.auth.currentUser) {
+      throw new Error('User not authenticated');
+    }
+
+    const deleteSessionFunc = httpsCallable<{sessionId: string}, {success: boolean}>(this.functions, 'deleteSession');
+    await deleteSessionFunc({ sessionId });
+  }
+
+  async updateSessionTitle(sessionId: string, title: string): Promise<void> {
+    const sessionRef = doc(this.firestore, `sessions/${sessionId}`);
+    await updateDoc(sessionRef, { title });
+  }
 }

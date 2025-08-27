@@ -31,6 +31,7 @@ export class DashboardComponent implements OnInit {
   uploading = false;
   uploadProgress = '';
   deleting: string | null = null;
+  deletingSession: string | null = null;
 
   // RAG Chat (document-based)
   sessions: ChatSession[] = [];
@@ -144,12 +145,26 @@ export class DashboardComponent implements OnInit {
       if (this.currentSession?.id) {
         await this.chatService.addDocumentToSession(this.currentSession.id, docId);
         console.log(`Associated document ${docId} with session ${this.currentSession.id}`);
+        
+        // Update current session's associated documents immediately
+        if (!this.currentSession.associatedDocuments) {
+          this.currentSession.associatedDocuments = [];
+        }
+        this.currentSession.associatedDocuments.push(docId);
       }
 
       this.uploadProgress = 'Complete!';
       
       // Refresh documents list
       await this.loadUserData();
+      
+      // Force UI refresh by re-selecting current session
+      if (this.currentSession?.id) {
+        const updatedSession = this.sessions.find(s => s.id === this.currentSession!.id);
+        if (updatedSession) {
+          this.currentSession = updatedSession;
+        }
+      }
       
     } catch (error) {
       console.error('Error processing file:', error);
@@ -209,12 +224,30 @@ export class DashboardComponent implements OnInit {
     this.messages.push(userMessage);
 
     try {
+      // Check if this is the first message in the session (excluding the user message we just added)
+      const isFirstMessage = this.messages.length === 1;
+      
       const response = await this.chatService.sendMessage(
         this.currentSession.id!,
         messageText,
         this.selectedDocument?.id,
         this.globalModelSelection.getSelectionForRequest()
       );
+      
+      // Update session title if this is the first question
+      if (isFirstMessage && this.currentSession) {
+        const abbreviatedTitle = this.abbreviateTitle(messageText);
+        await this.chatService.updateSessionTitle(this.currentSession.id!, abbreviatedTitle);
+        
+        // Update local session title
+        this.currentSession.title = abbreviatedTitle;
+        
+        // Update in sessions list
+        const sessionIndex = this.sessions.findIndex(s => s.id === this.currentSession!.id);
+        if (sessionIndex !== -1) {
+          this.sessions[sessionIndex].title = abbreviatedTitle;
+        }
+      }
       
       // Replace or add the assistant message
       this.messages.push(response);
@@ -527,5 +560,52 @@ export class DashboardComponent implements OnInit {
   isDocumentByIdCompatible(docId: string): boolean {
     const doc = this.getDocumentById(docId);
     return doc ? this.isDocumentCompatible(doc) : false;
+  }
+
+  async deleteSession(session: ChatSession) {
+    if (!session.id || this.deletingSession) {
+      return;
+    }
+
+    const confirmed = confirm(`Are you sure you want to delete "${session.title}"? This will also delete all associated documents and messages permanently.`);
+    if (!confirmed) {
+      return;
+    }
+
+    this.deletingSession = session.id;
+
+    try {
+      await this.chatService.deleteSession(session.id);
+      
+      // Remove from local sessions list
+      this.sessions = this.sessions.filter(s => s.id !== session.id);
+      
+      // Clear selection if this session was selected
+      if (this.currentSession?.id === session.id) {
+        this.currentSession = null;
+        this.messages = [];
+        this.selectedDocument = null;
+      }
+      
+      // Refresh data to ensure consistency
+      await this.loadUserData();
+      
+    } catch (error) {
+      console.error('Error deleting session:', error);
+      alert('Failed to delete session. Please try again.');
+    } finally {
+      this.deletingSession = null;
+    }
+  }
+
+  abbreviateTitle(text: string): string {
+    const maxLength = 40;
+    const cleaned = text.trim().replace(/\s+/g, ' ');
+    
+    if (cleaned.length <= maxLength) {
+      return cleaned;
+    }
+    
+    return cleaned.substring(0, maxLength).trim() + '...';
   }
 }
