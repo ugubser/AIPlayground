@@ -8,6 +8,101 @@ const db = admin.firestore();
 
 const isEmulator = process.env.FUNCTIONS_EMULATOR === 'true';
 
+// OpenMeteo geocoding function
+async function getCityCoordinates(cityName: string): Promise<{ lat: number; lon: number; name: string } | null> {
+  try {
+    const geocodingUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cityName)}&count=1`;
+    
+    if (isEmulator) {
+      console.log('🌍 Geocoding request:', geocodingUrl);
+    }
+    
+    const response = await fetch(geocodingUrl);
+    
+    if (!response.ok) {
+      console.error('Geocoding API error:', response.status, response.statusText);
+      return null;
+    }
+    
+    const data = await response.json() as any;
+    const results = data.results;
+    
+    if (!results || results.length === 0) {
+      console.log(`No geocoding results for city: ${cityName}`);
+      return null;
+    }
+    
+    const location = results[0];
+    const coordinates = {
+      lat: location.latitude,
+      lon: location.longitude,
+      name: location.name
+    };
+    
+    if (isEmulator) {
+      console.log('🌍 Geocoding result:', coordinates);
+    }
+    
+    return coordinates;
+  } catch (error) {
+    console.error('Error in geocoding:', error);
+    return null;
+  }
+}
+
+async function getWeatherData(lat: number, lon: number): Promise<string> {
+  try {
+    if (isEmulator) {
+      console.log('🌤️ Fetching weather data for coordinates:', { lat, lon });
+    }
+
+    const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&timezone=auto`;
+    
+    const response = await fetch(weatherUrl);
+    
+    if (!response.ok) {
+      console.error('Weather API error:', response.status, response.statusText);
+      return 'Weather data unavailable';
+    }
+    
+    const data = await response.json() as any;
+    const current = data.current;
+    
+    if (!current) {
+      console.error('No current weather data in response');
+      return 'Weather data unavailable';
+    }
+    
+    const temperature = Math.round(current.temperature_2m || 0);
+    const humidity = Math.round(current.relative_humidity_2m || 0);
+    const weatherCode = current.weather_code || 0;
+    const windSpeed = Math.round(current.wind_speed_10m || 0);
+    
+    // WMO Weather interpretation codes
+    let condition = 'Clear';
+    if (weatherCode === 0) condition = 'Clear sky';
+    else if (weatherCode <= 3) condition = 'Partly cloudy';
+    else if (weatherCode <= 48) condition = 'Foggy';
+    else if (weatherCode <= 57) condition = 'Drizzle';
+    else if (weatherCode <= 67) condition = 'Rain';
+    else if (weatherCode <= 77) condition = 'Snow';
+    else if (weatherCode <= 82) condition = 'Rain showers';
+    else if (weatherCode <= 86) condition = 'Snow showers';
+    else if (weatherCode <= 99) condition = 'Thunderstorm';
+    
+    const weatherDescription = `${condition}, ${temperature}°C, ${humidity}% humidity, ${windSpeed} km/h wind`;
+    
+    if (isEmulator) {
+      console.log('🌤️ Weather result:', { weatherCode, temperature, humidity, windSpeed, condition });
+    }
+    
+    return weatherDescription;
+  } catch (error) {
+    console.error('Error fetching weather data:', error);
+    return 'Weather data unavailable';
+  }
+}
+
 function cosine(a: number[], b: number[]): number {
   if (a.length !== b.length) return 0;
   let dotProduct = 0;
@@ -1006,29 +1101,73 @@ export const mcpWeatherServer = functions
 
         if (name === 'get_weather') {
           const city = toolArgs?.city || '';
-          let weather = 'Dim';
-
-          if (city.toLowerCase().includes('new york')) {
-            weather = 'Sunny';
-          } else if (city.toLowerCase().includes('zurich')) {
-            weather = 'Rainy';
+          
+          if (!city) {
+            const errorResponse = {
+              jsonrpc: '2.0',
+              id: id || 1,
+              error: {
+                code: -32602,
+                message: 'City parameter is required'
+              }
+            };
+            res.json(errorResponse);
+            return;
           }
 
-          const callResponse = {
-            jsonrpc: '2.0',
-            id: id || 1,
-            result: {
-              content: [
-                {
-                  type: 'text',
-                  text: `The weather in ${city} is ${weather}`
+          try {
+            // Get coordinates for the city
+            const coordinates = await getCityCoordinates(city);
+            
+            if (!coordinates) {
+              const callResponse = {
+                jsonrpc: '2.0',
+                id: id || 1,
+                result: {
+                  content: [
+                    {
+                      type: 'text',
+                      text: `Sorry, I couldn't find coordinates for "${city}". Please try a major city name.`
+                    }
+                  ]
                 }
-              ]
+              };
+              res.json(callResponse);
+              return;
             }
-          };
 
-          res.json(callResponse);
-          return;
+            // Get weather data
+            const weather = await getWeatherData(coordinates.lat, coordinates.lon);
+            
+            const callResponse = {
+              jsonrpc: '2.0',
+              id: id || 1,
+              result: {
+                content: [
+                  {
+                    type: 'text',
+                    text: `The weather in ${coordinates.name} is: ${weather}`
+                  }
+                ]
+              }
+            };
+
+            res.json(callResponse);
+            return;
+
+          } catch (error) {
+            console.error('Error getting weather:', error);
+            const errorResponse = {
+              jsonrpc: '2.0',
+              id: id || 1,
+              error: {
+                code: -32603,
+                message: 'Failed to get weather data'
+              }
+            };
+            res.json(errorResponse);
+            return;
+          }
         }
 
         // Unknown tool

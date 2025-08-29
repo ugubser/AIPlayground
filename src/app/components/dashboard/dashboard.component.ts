@@ -377,14 +377,12 @@ export class DashboardComponent implements OnInit {
   }
 
   private async sendMcpMessage(message: string): Promise<ChatMessage> {
-    // For now, simulate tool calling by checking for weather-related keywords
+    // Check for weather-related keywords
     const isWeatherQuery = message.toLowerCase().includes('weather');
     
     if (isWeatherQuery) {
-      // Extract city from message (simple approach)
-      let city = 'unknown';
-      if (message.toLowerCase().includes('new york')) city = 'New York';
-      else if (message.toLowerCase().includes('zurich')) city = 'Zurich';
+      // Extract city from message using simple regex patterns
+      const city = this.extractCityFromMessage(message);
       
       try {
         const toolResult = await this.mcpService.callTool({
@@ -414,6 +412,46 @@ export class DashboardComponent implements OnInit {
         this.globalModelSelection.getSelectionForRequest()
       );
     }
+  }
+
+  private extractCityFromMessage(message: string): string {
+    const lowerMessage = message.toLowerCase();
+    
+    // Common patterns for weather queries
+    const patterns = [
+      /weather in ([^?,.!]+)/,
+      /weather for ([^?,.!]+)/,
+      /weather at ([^?,.!]+)/,
+      /weather of ([^?,.!]+)/,
+      /([^?,.!\s]+)'s weather/,
+      /([^?,.!\s]+) weather/
+    ];
+    
+    for (const pattern of patterns) {
+      const match = lowerMessage.match(pattern);
+      if (match && match[1]) {
+        return match[1].trim();
+      }
+    }
+    
+    // Fallback: look for city names after common prepositions
+    const words = lowerMessage.split(/\s+/);
+    const weatherIndex = words.findIndex(word => word.includes('weather'));
+    
+    if (weatherIndex !== -1) {
+      // Look for city names around the weather keyword
+      const candidates = [
+        words[weatherIndex + 1],  // "weather Singapore"
+        words[weatherIndex - 1],  // "Singapore weather"
+      ].filter(Boolean);
+      
+      if (candidates.length > 0) {
+        return candidates[0];
+      }
+    }
+    
+    // Last resort: return the whole message and let the geocoding API handle it
+    return message.replace(/weather|what's|what|is|the|in|for|at|of|\?|!|\./gi, '').trim() || 'unknown city';
   }
 
   onGeneralEnterKey(event: KeyboardEvent) {
