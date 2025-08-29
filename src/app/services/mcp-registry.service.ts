@@ -59,7 +59,7 @@ export class McpRegistryService {
         name: 'Weather Server',
         description: 'Local weather and forecast data via OpenMeteo APIs',
         url: environment.production 
-          ? 'https://your-project.cloudfunctions.net/mcpWeatherServer'
+          ? 'https://us-central1-aiplayground-6e5be.cloudfunctions.net/mcpWeatherServer'
           : 'http://127.0.0.1:5001/aiplayground-6e5be/us-central1/mcpWeatherServer',
         type: 'http',
         enabled: true,
