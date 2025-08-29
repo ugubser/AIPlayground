@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import * as pdfjsLib from 'pdfjs-dist';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
+import { APP_CONSTANTS } from '../config/app-constants';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = '/assets/pdf.worker.min.js';
 
@@ -38,8 +39,8 @@ export class PdfProcessorService {
 
   async chunkPages(pages: string[]): Promise<ChunkData[]> {
     const splitter = new RecursiveCharacterTextSplitter({
-      chunkSize: 400,  // Reduced to stay well under 512 token limit
-      chunkOverlap: 50, // Reduced proportionally
+      chunkSize: APP_CONSTANTS.PDF_PROCESSING.CHUNK_SIZE,
+      chunkOverlap: APP_CONSTANTS.PDF_PROCESSING.CHUNK_OVERLAP,
       separators: ['\n\n', '\n', ' ', '']
     });
 

@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewChild, ElementRef, AfterViewChecked } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewChecked } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
@@ -10,6 +10,7 @@ import { GlobalModelSelectionService } from '../../services/global-model-selecti
 import { DynamicModelSelection } from '../../services/models-config.service';
 import { McpService } from '../../services/mcp.service';
 import { McpRegistryService, McpServerConfig, McpTool } from '../../services/mcp-registry.service';
+import { APP_CONSTANTS } from '../../config/app-constants';
 
 interface VisionMessage {
   role: 'user' | 'assistant';
@@ -26,7 +27,7 @@ interface VisionMessage {
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.css'
 })
-export class DashboardComponent implements OnInit {
+export class DashboardComponent implements OnInit, OnDestroy {
   // ViewChild references for auto-scroll
   @ViewChild('ragMessagesContainer') ragMessagesContainer!: ElementRef;
   @ViewChild('generalMessagesContainer') generalMessagesContainer!: ElementRef;
@@ -61,6 +62,9 @@ export class DashboardComponent implements OnInit {
   activeTab: 'rag' | 'chat' | 'vision' = 'rag';
   dragOver = false;
   showAddDocuments = false;
+
+  // Track timeouts for cleanup
+  private timeouts: any[] = [];
 
   // Vision functionality
   selectedImage: { url: string; name: string; size: number; file: File } | null = null;
@@ -99,10 +103,11 @@ export class DashboardComponent implements OnInit {
     }
   }
 
-  private scrollToBottomAfterDelay(container: ElementRef, delay: number = 100) {
-    setTimeout(() => {
+  private scrollToBottomAfterDelay(container: ElementRef, delay: number = APP_CONSTANTS.TIMEOUTS.SCROLL_DELAY) {
+    const timeoutId = setTimeout(() => {
       this.scrollToBottom(container);
     }, delay);
+    this.timeouts.push(timeoutId);
   }
 
   ngOnInit() {
@@ -168,8 +173,8 @@ export class DashboardComponent implements OnInit {
       return;
     }
 
-    if (file.size > 50 * 1024 * 1024) { // 50MB limit
-      alert('File size must be less than 50MB.');
+    if (file.size > APP_CONSTANTS.FILE_SIZE.PDF_MAX_SIZE) {
+      alert(`File size must be less than ${APP_CONSTANTS.FILE_SIZE.PDF_MAX_SIZE / (1024 * 1024)}MB.`);
       return;
     }
 
@@ -222,9 +227,10 @@ export class DashboardComponent implements OnInit {
       this.uploadProgress = 'Error processing file. Please try again.';
     } finally {
       this.uploading = false;
-      setTimeout(() => {
+      const timeoutId = setTimeout(() => {
         this.uploadProgress = '';
-      }, 2000);
+      }, APP_CONSTANTS.TIMEOUTS.UPLOAD_COMPLETE_DISPLAY);
+      this.timeouts.push(timeoutId);
     }
   }
 
@@ -254,7 +260,7 @@ export class DashboardComponent implements OnInit {
       this.messages = await this.chatService.getSessionMessages(session.id!);
       // Scroll to bottom to show latest messages after loading
       if (this.messages.length > 0) {
-        this.scrollToBottomAfterDelay(this.ragMessagesContainer, 200);
+        this.scrollToBottomAfterDelay(this.ragMessagesContainer, APP_CONSTANTS.TIMEOUTS.SCROLL_DELAY_EXTENDED);
       }
     } catch (error) {
       console.error('Error loading messages:', error);
@@ -540,13 +546,13 @@ export class DashboardComponent implements OnInit {
   }
 
   handleImageFile(file: File) {
-    if (!file.type.startsWith('image/')) {
+    if (!file.type.startsWith(APP_CONSTANTS.FILE_TYPES.IMAGE_PREFIX)) {
       alert('Please select an image file.');
       return;
     }
 
-    if (file.size > 10 * 1024 * 1024) { // 10MB limit
-      alert('Image size must be less than 10MB.');
+    if (file.size > APP_CONSTANTS.FILE_SIZE.IMAGE_MAX_SIZE) {
+      alert(`Image size must be less than ${APP_CONSTANTS.FILE_SIZE.IMAGE_MAX_SIZE / (1024 * 1024)}MB.`);
       return;
     }
 
@@ -796,7 +802,7 @@ export class DashboardComponent implements OnInit {
   }
 
   abbreviateTitle(text: string): string {
-    const maxLength = 40;
+    const maxLength = APP_CONSTANTS.UI.MAX_TITLE_LENGTH;
     const cleaned = text.trim().replace(/\s+/g, ' ');
     
     if (cleaned.length <= maxLength) {
@@ -873,6 +879,14 @@ export class DashboardComponent implements OnInit {
 
   getEnabledServersCount(): number {
     return this.mcpServers.filter(s => s.enabled && s.status === 'online').length;
+  }
+
+  ngOnDestroy() {
+    // Clean up all pending timeouts to prevent memory leaks
+    this.timeouts.forEach(timeoutId => {
+      clearTimeout(timeoutId);
+    });
+    this.timeouts = [];
   }
 
 }

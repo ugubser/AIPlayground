@@ -2,6 +2,7 @@ import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import fetch from 'node-fetch';
 import { modelsConfigService } from './models-config';
+import { FUNCTION_CONSTANTS } from './config/function-constants';
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -204,7 +205,7 @@ function cosine(a: number[], b: number[]): number {
 }
 
 export const embedChunks = functions
-  .runWith({ timeoutSeconds: 540, memory: '2GB' })
+  .runWith({ timeoutSeconds: FUNCTION_CONSTANTS.TIMEOUTS.EMBED_CHUNKS, memory: FUNCTION_CONSTANTS.MEMORY.LARGE })
   .https.onCall(async (data, context) => {
     if (!context.auth) {
       throw new functions.https.HttpsError('unauthenticated', 'Login required');
@@ -212,8 +213,8 @@ export const embedChunks = functions
     
     const { 
       texts, 
-      provider = 'together.ai', 
-      model = 'BAAI/bge-base-en-v1.5' 
+      provider = FUNCTION_CONSTANTS.DEFAULTS.EMBED_PROVIDER, 
+      model = FUNCTION_CONSTANTS.DEFAULTS.EMBED_MODEL 
     } = data as { 
       texts: string[]; 
       provider?: string; 
@@ -224,8 +225,8 @@ export const embedChunks = functions
       throw new functions.https.HttpsError('invalid-argument', 'texts array required');
     }
 
-    if (texts.length > 256) {
-      throw new functions.https.HttpsError('invalid-argument', 'Maximum 256 texts per batch');
+    if (texts.length > FUNCTION_CONSTANTS.BATCH_LIMITS.MAX_TEXTS_PER_BATCH) {
+      throw new functions.https.HttpsError('invalid-argument', `Maximum ${FUNCTION_CONSTANTS.BATCH_LIMITS.MAX_TEXTS_PER_BATCH} texts per batch`);
     }
 
     // Validate provider supports embeddings
@@ -323,7 +324,7 @@ export const embedChunks = functions
   });
 
 export const chatRag = functions
-  .runWith({ timeoutSeconds: 60, memory: '1GB' })
+  .runWith({ timeoutSeconds: FUNCTION_CONSTANTS.TIMEOUTS.CHAT_RAG, memory: FUNCTION_CONSTANTS.MEMORY.SMALL })
   .https.onCall(async (data, context) => {
     if (!context.auth) {
       throw new functions.https.HttpsError('unauthenticated', 'Login required');
@@ -332,7 +333,7 @@ export const chatRag = functions
     const { 
       sessionId, 
       message, 
-      k = 8, 
+      k = FUNCTION_CONSTANTS.BATCH_LIMITS.DEFAULT_TOP_K, 
       restrictDocId,
       llmProvider,
       llmModel,
@@ -343,10 +344,10 @@ export const chatRag = functions
     // Use provided models from UI - these should always be provided by the frontend
     // Fallback to config defaults only if UI doesn't provide them
     const defaults = modelsConfigService.getDefaultSelection('rag') as any;
-    const actualLlmProvider = llmProvider || defaults?.llm?.provider || 'openrouter.ai';
-    const actualLlmModel = llmModel || defaults?.llm?.model || 'openai/gpt-oss-20b:free';
-    const actualEmbedProvider = embedProvider || defaults?.embed?.provider || 'together.ai';
-    const actualEmbedModel = embedModel || defaults?.embed?.model || 'BAAI/bge-base-en-v1.5';
+    const actualLlmProvider = llmProvider || defaults?.llm?.provider || FUNCTION_CONSTANTS.DEFAULTS.LLM_PROVIDER;
+    const actualLlmModel = llmModel || defaults?.llm?.model || FUNCTION_CONSTANTS.DEFAULTS.LLM_MODEL;
+    const actualEmbedProvider = embedProvider || defaults?.embed?.provider || FUNCTION_CONSTANTS.DEFAULTS.EMBED_PROVIDER;
+    const actualEmbedModel = embedModel || defaults?.embed?.model || FUNCTION_CONSTANTS.DEFAULTS.EMBED_MODEL;
 
     console.log('Received model parameters:', { llmProvider, llmModel, embedProvider, embedModel });
     console.log('Using models:', { actualLlmProvider, actualLlmModel, actualEmbedProvider, actualEmbedModel });
@@ -456,7 +457,7 @@ export const chatRag = functions
           let chunksQuery = db.collectionGroup('chunks')
             .where('uid', '==', uid)
             .where('docId', '==', restrictDocId)
-            .limit(5000);
+            .limit(FUNCTION_CONSTANTS.BATCH_LIMITS.MAX_CHUNKS_QUERY);
           
           console.log('About to execute compound chunks query...');
           chunksSnapshot = await chunksQuery.get();
@@ -471,7 +472,7 @@ export const chatRag = functions
             db.collectionGroup('chunks')
               .where('uid', '==', uid)
               .where('docId', '==', docId)
-              .limit(1000)
+              .limit(FUNCTION_CONSTANTS.BATCH_LIMITS.MAX_SESSION_DOCS_QUERY)
               .get()
           );
           
@@ -496,7 +497,7 @@ export const chatRag = functions
           console.log(`Trying simple query: uid=${uid} (all documents)`);
           let chunksQuery = db.collectionGroup('chunks')
             .where('uid', '==', uid)
-            .limit(5000);
+            .limit(FUNCTION_CONSTANTS.BATCH_LIMITS.MAX_CHUNKS_QUERY);
           
           console.log('About to execute simple chunks query...');
           chunksSnapshot = await chunksQuery.get();
@@ -593,8 +594,8 @@ export const chatRag = functions
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        temperature: 0.2,
-        max_tokens: 1000
+        temperature: FUNCTION_CONSTANTS.LLM_CONFIG.RAG_TEMPERATURE,
+        max_tokens: FUNCTION_CONSTANTS.LLM_CONFIG.RAG_MAX_TOKENS
       };
 
       const llmHeaders = modelsConfigService.getProviderHeaders(actualLlmProvider, llmKey, 'rag');
@@ -673,7 +674,7 @@ export const chatRag = functions
   });
 
 export const generalChat = functions
-  .runWith({ timeoutSeconds: 60, memory: '1GB' })
+  .runWith({ timeoutSeconds: FUNCTION_CONSTANTS.TIMEOUTS.GENERAL_CHAT, memory: FUNCTION_CONSTANTS.MEMORY.SMALL })
   .https.onCall(async (data, context) => {
     if (!context.auth) {
       throw new functions.https.HttpsError('unauthenticated', 'Login required');
@@ -684,8 +685,8 @@ export const generalChat = functions
     // Use provided models from UI - these should always be provided by the frontend
     // Fallback to config defaults only if UI doesn't provide them
     const defaults = modelsConfigService.getDefaultSelection('chat') as any;
-    const actualLlmProvider = llmProvider || defaults?.llm?.provider || 'openrouter.ai';
-    const actualLlmModel = llmModel || defaults?.llm?.model || 'openai/gpt-oss-20b:free';
+    const actualLlmProvider = llmProvider || defaults?.llm?.provider || FUNCTION_CONSTANTS.DEFAULTS.LLM_PROVIDER;
+    const actualLlmModel = llmModel || defaults?.llm?.model || FUNCTION_CONSTANTS.DEFAULTS.LLM_MODEL;
 
     console.log('General chat request:', { actualLlmProvider, actualLlmModel });
 
@@ -712,8 +713,8 @@ export const generalChat = functions
         messages: [
           { role: 'user', content: message }
         ],
-        temperature: 0.7,
-        max_tokens: 2000
+        temperature: FUNCTION_CONSTANTS.LLM_CONFIG.CHAT_TEMPERATURE,
+        max_tokens: FUNCTION_CONSTANTS.LLM_CONFIG.CHAT_MAX_TOKENS
       };
 
       const llmHeaders = modelsConfigService.getProviderHeaders(actualLlmProvider, llmKey, 'chat');
@@ -777,7 +778,7 @@ export const generalChat = functions
   });
 
 export const mcpChat = functions
-  .runWith({ timeoutSeconds: 60, memory: '1GB' })
+  .runWith({ timeoutSeconds: FUNCTION_CONSTANTS.TIMEOUTS.MCP_CHAT, memory: FUNCTION_CONSTANTS.MEMORY.SMALL })
   .https.onCall(async (data, context) => {
     if (!context.auth) {
       throw new functions.https.HttpsError('unauthenticated', 'Login required');
@@ -787,8 +788,8 @@ export const mcpChat = functions
 
     // Use provided models from UI
     const defaults = modelsConfigService.getDefaultSelection('chat') as any;
-    const actualLlmProvider = llmProvider || defaults?.llm?.provider || 'openrouter.ai';
-    const actualLlmModel = llmModel || defaults?.llm?.model || 'meta-llama/llama-4-maverick:free';
+    const actualLlmProvider = llmProvider || defaults?.llm?.provider || FUNCTION_CONSTANTS.DEFAULTS.LLM_PROVIDER;
+    const actualLlmModel = llmModel || defaults?.llm?.model || FUNCTION_CONSTANTS.DEFAULTS.MCP_MODEL;
 
     console.log('MCP Chat request:', { 
       actualLlmProvider, 
@@ -849,8 +850,8 @@ export const mcpChat = functions
       const llmRequestBody: any = {
         model: actualLlmModel,
         messages: messages,
-        temperature: 0.7,
-        max_tokens: 2000
+        temperature: FUNCTION_CONSTANTS.LLM_CONFIG.CHAT_TEMPERATURE,
+        max_tokens: FUNCTION_CONSTANTS.LLM_CONFIG.CHAT_MAX_TOKENS
       };
 
       // Add tools for supported providers (only on initial request)
@@ -953,7 +954,7 @@ export const mcpChat = functions
   });
 
 export const visionChat = functions
-  .runWith({ timeoutSeconds: 60, memory: '1GB' })
+  .runWith({ timeoutSeconds: FUNCTION_CONSTANTS.TIMEOUTS.VISION_CHAT, memory: FUNCTION_CONSTANTS.MEMORY.SMALL })
   .https.onCall(async (data, context) => {
     if (!context.auth) {
       throw new functions.https.HttpsError('unauthenticated', 'Login required');
@@ -964,8 +965,8 @@ export const visionChat = functions
     // Use provided models from UI - these should always be provided by the frontend
     // Fallback to config defaults only if UI doesn't provide them
     const defaults = modelsConfigService.getDefaultSelection('vision') as any;
-    const actualVisionProvider = visionProvider || defaults?.vision?.provider || 'openrouter.ai';
-    const actualVisionModel = visionModel || defaults?.vision?.model || 'openai/gpt-4o';
+    const actualVisionProvider = visionProvider || defaults?.vision?.provider || FUNCTION_CONSTANTS.DEFAULTS.LLM_PROVIDER;
+    const actualVisionModel = visionModel || defaults?.vision?.model || FUNCTION_CONSTANTS.DEFAULTS.VISION_MODEL;
 
     console.log('Vision chat request:', { actualVisionProvider, actualVisionModel });
 
@@ -1006,8 +1007,8 @@ export const visionChat = functions
         messages: [
           { role: 'user', content: messageContent }
         ],
-        temperature: 0.7,
-        max_tokens: 2000
+        temperature: FUNCTION_CONSTANTS.LLM_CONFIG.VISION_TEMPERATURE,
+        max_tokens: FUNCTION_CONSTANTS.LLM_CONFIG.VISION_MAX_TOKENS
       };
 
       const visionHeaders = modelsConfigService.getProviderHeaders(actualVisionProvider, visionKey, 'vision');
@@ -1078,7 +1079,7 @@ export const visionChat = functions
   });
 
 export const deleteDocument = functions
-  .runWith({ timeoutSeconds: 60, memory: '1GB' })
+  .runWith({ timeoutSeconds: FUNCTION_CONSTANTS.TIMEOUTS.DELETE_DOCUMENT, memory: FUNCTION_CONSTANTS.MEMORY.SMALL })
   .https.onCall(async (data, context) => {
     if (!context.auth) {
       throw new functions.https.HttpsError('unauthenticated', 'Login required');
@@ -1169,7 +1170,7 @@ export const deleteDocument = functions
   });
 
 export const deleteSession = functions
-  .runWith({ timeoutSeconds: 300, memory: '1GB' })
+  .runWith({ timeoutSeconds: FUNCTION_CONSTANTS.TIMEOUTS.DELETE_SESSION, memory: FUNCTION_CONSTANTS.MEMORY.SMALL })
   .https.onCall(async (data, context) => {
     if (!context.auth) {
       throw new functions.https.HttpsError('unauthenticated', 'Login required');
@@ -1283,7 +1284,7 @@ export const deleteSession = functions
 
 // MCP Weather Server (SSE-based for web clients)
 export const mcpWeatherServer = functions
-  .runWith({ timeoutSeconds: 540, memory: '1GB' })
+  .runWith({ timeoutSeconds: FUNCTION_CONSTANTS.TIMEOUTS.MCP_WEATHER_SERVER, memory: FUNCTION_CONSTANTS.MEMORY.SMALL })
   .https.onRequest(async (req, res) => {
     // Set CORS headers
     res.set({
@@ -1547,12 +1548,22 @@ export const mcpWeatherServer = functions
         // Keep connection alive with heartbeat
         const heartbeat = setInterval(() => {
           res.write(`data: ${JSON.stringify({ type: 'heartbeat', timestamp: Date.now() })}\n\n`);
-        }, 30000);
+        }, FUNCTION_CONSTANTS.SSE.HEARTBEAT_INTERVAL);
 
         // Clean up on client disconnect
         req.on('close', () => {
           clearInterval(heartbeat);
           console.log('MCP SSE client disconnected');
+        });
+
+        // Clean up on response finish
+        res.on('finish', () => {
+          clearInterval(heartbeat);
+        });
+
+        // Clean up on response error
+        res.on('error', () => {
+          clearInterval(heartbeat);
         });
 
         return;
