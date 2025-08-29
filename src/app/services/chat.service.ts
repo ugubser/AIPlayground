@@ -3,7 +3,8 @@ import { Firestore, collection, doc, addDoc, getDocs, query, where, orderBy, Tim
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { Auth } from '@angular/fire/auth';
 import { DynamicModelSelection } from './models-config.service';
-import { McpService, MCPToolCall } from './mcp.service';
+import { McpService } from './mcp.service';
+import { McpRegistryService, McpToolCall } from './mcp-registry.service';
 
 export interface ChatSession {
   id?: string;
@@ -65,7 +66,8 @@ export class ChatService {
     private firestore: Firestore,
     private functions: Functions,
     private auth: Auth,
-    private mcpService: McpService
+    private mcpService: McpService,
+    private mcpRegistry: McpRegistryService
   ) { }
 
   async createSession(title?: string, associatedDocuments?: string[]): Promise<string> {
@@ -354,7 +356,7 @@ export class ChatService {
     await updateDoc(sessionRef, { title });
   }
 
-  async sendMcpMessage(message: string, modelSelection?: DynamicModelSelection, toolResults?: any[]): Promise<{ answer: string; toolCalls?: MCPToolCall[] }> {
+  async sendMcpMessage(message: string, modelSelection?: DynamicModelSelection, toolResults?: any[]): Promise<{ answer: string; toolCalls?: { name: string; arguments: Record<string, any> }[] }> {
     if (!this.auth.currentUser) {
       throw new Error('User not authenticated');
     }
@@ -366,8 +368,9 @@ export class ChatService {
 
       // Add tools only on initial request (not follow-up)
       if (!toolResults) {
-        const tools = await this.mcpService.getTools();
+        const tools = this.mcpRegistry.getAvailableTools();
         mcpRequest.tools = tools;
+        console.log('💬 MCP Chat: Available tools for LLM:', tools.length, tools.map(t => t.name));
       } else {
         // This is a follow-up request with tool results
         mcpRequest.toolResults = toolResults;
@@ -389,7 +392,7 @@ export class ChatService {
 
       return {
         answer: data.answer,
-        toolCalls: data.toolCalls as MCPToolCall[]
+        toolCalls: data.toolCalls as { name: string; arguments: Record<string, any> }[]
       };
 
     } catch (error) {

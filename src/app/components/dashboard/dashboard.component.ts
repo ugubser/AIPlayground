@@ -8,7 +8,8 @@ import { ChatService, ChatSession, ChatMessage } from '../../services/chat.servi
 import { AuthService } from '../../services/auth.service';
 import { GlobalModelSelectionService } from '../../services/global-model-selection.service';
 import { DynamicModelSelection } from '../../services/models-config.service';
-import { McpService, MCPTool } from '../../services/mcp.service';
+import { McpService } from '../../services/mcp.service';
+import { McpRegistryService, McpServerConfig, McpTool } from '../../services/mcp-registry.service';
 
 interface VisionMessage {
   role: 'user' | 'assistant';
@@ -53,7 +54,8 @@ export class DashboardComponent implements OnInit {
 
   // MCP (Model Context Protocol) settings
   mcpEnabled = false;
-  availableTools: MCPTool[] = [];
+  mcpServers: McpServerConfig[] = [];
+  availableTools: McpTool[] = [];
 
   // UI State
   activeTab: 'rag' | 'chat' | 'vision' = 'rag';
@@ -74,7 +76,8 @@ export class DashboardComponent implements OnInit {
     private chatService: ChatService,
     private authService: AuthService,
     private globalModelSelection: GlobalModelSelectionService,
-    private mcpService: McpService
+    private mcpService: McpService,
+    private mcpRegistry: McpRegistryService
   ) {}
 
   private scrollToBottom(container: ElementRef, smooth: boolean = true) {
@@ -104,6 +107,18 @@ export class DashboardComponent implements OnInit {
 
   ngOnInit() {
     this.loadUserData();
+    this.initializeMcpRegistry();
+  }
+
+  private initializeMcpRegistry() {
+    // Subscribe to MCP registry updates
+    this.mcpRegistry.servers$.subscribe(servers => {
+      this.mcpServers = servers;
+    });
+
+    this.mcpRegistry.availableTools$.subscribe(tools => {
+      this.availableTools = tools;
+    });
   }
 
   async loadUserData() {
@@ -378,10 +393,25 @@ export class DashboardComponent implements OnInit {
 
   private async sendMcpMessage(message: string): Promise<ChatMessage> {
     try {
+      // Get current selection and extract MCP provider/model if available
+      const currentSelection = this.globalModelSelection.getSelectionForRequest();
+      let mcpModelSelection = currentSelection;
+      
+      // If we have an MCP selection in the current selection, use it for LLM
+      if (currentSelection && currentSelection['mcp']) {
+        mcpModelSelection = {
+          llm: {
+            provider: currentSelection['mcp'].provider,
+            model: currentSelection['mcp'].model
+          }
+        };
+        console.log('Using MCP provider for tool calling:', mcpModelSelection);
+      }
+      
       // Step 1: Send message to LLM with available tools
       const mcpResponse = await this.chatService.sendMcpMessage(
         message,
-        this.globalModelSelection.getSelectionForRequest()
+        mcpModelSelection
       );
       
       // Step 2: If LLM requested tool calls, execute them and get final response
@@ -459,11 +489,6 @@ export class DashboardComponent implements OnInit {
     else if (tab === 'vision') appName = 'vision';
     
     this.globalModelSelection.updateCurrentApp(appName);
-    
-    // If switching to chat tab and MCP was enabled, update to MCP models
-    if (tab === 'chat' && this.mcpEnabled) {
-      this.updateModelSelectionForMcp();
-    }
   }
 
   // Vision functionality methods
@@ -760,39 +785,68 @@ export class DashboardComponent implements OnInit {
     
     if (this.mcpEnabled) {
       try {
-        await this.mcpService.initialize();
-        this.availableTools = await this.mcpService.getTools();
-        console.log('MCP initialized with tools:', this.availableTools);
-        this.updateModelSelectionForMcp();
+        // Initialize enabled servers
+        const enabledServers = this.mcpRegistry.getEnabledServers();
+        console.log('Initializing enabled servers:', enabledServers.map(s => s.name));
+        
+        for (const server of enabledServers) {
+          await this.mcpRegistry.initializeServer(server.id);
+        }
+        
+        // Debug: Check available tools after initialization
+        const availableTools = this.mcpRegistry.getAvailableTools();
+        console.log('✅ Available tools after MCP init:', availableTools.length, availableTools.map(t => t.name));
+        
       } catch (error) {
         console.error('Failed to initialize MCP:', error);
         this.mcpEnabled = false;
-        alert('Failed to connect to MCP server. Please ensure the Firebase emulators are running.');
+        alert('Failed to connect to MCP servers. Please check server availability.');
       }
-    } else {
-      // Switch back to regular LLM models for chat
-      this.globalModelSelection.updateCurrentApp('chat');
     }
   }
 
-  private updateModelSelectionForMcp() {
-    // Create a custom selection for MCP models from chat->MCP section
-    const modelsConfigService = this.globalModelSelection.getModelsConfig();
-    const mcpProviders = modelsConfigService.getProviders('chat', 'MCP');
+  async onServerToggle(serverId: string, event: Event) {
+    const checkbox = event.target as HTMLInputElement;
+    const enabled = checkbox.checked;
     
-    if (mcpProviders.length > 0) {
-      const firstProvider = mcpProviders[0];
-      const models = modelsConfigService.getModels('chat', 'MCP', firstProvider);
-      if (models.length > 0) {
-        const mcpSelection = {
-          llm: {
-            provider: firstProvider,
-            model: models[0]
-          }
-        };
-        this.globalModelSelection.updateSelection(mcpSelection);
-        console.log('Updated to MCP models:', mcpSelection);
-      }
+    try {
+      await this.mcpRegistry.toggleServer(serverId, enabled);
+      console.log(`Server ${serverId} ${enabled ? 'enabled' : 'disabled'}`);
+    } catch (error) {
+      console.error('Error toggling server:', error);
+      // Revert checkbox state on error
+      checkbox.checked = !enabled;
     }
   }
+
+  getStatusText(status: string): string {
+    switch (status) {
+      case 'online': return '✅ Online';
+      case 'offline': return '⭕ Offline';
+      case 'error': return '❌ Error';
+      default: return '⚪ Unknown';
+    }
+  }
+
+  getStatusIcon(status: string): string {
+    switch (status) {
+      case 'online': return '✅';
+      case 'offline': return '⭕';
+      case 'error': return '❌';
+      default: return '⚪';
+    }
+  }
+
+  getToolNames(tools: McpTool[]): string {
+    return tools.map(t => t.name).join(', ');
+  }
+
+  getTotalEnabledTools(): number {
+    return this.availableTools.length;
+  }
+
+  getEnabledServersCount(): number {
+    return this.mcpServers.filter(s => s.enabled && s.status === 'online').length;
+  }
+
 }

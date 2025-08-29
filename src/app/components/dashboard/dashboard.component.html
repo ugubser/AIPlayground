@@ -297,9 +297,25 @@
             <span class="checkmark"></span>
             Enable MCP (Tool Calling)
           </label>
-          <small class="mcp-info" *ngIf="mcpEnabled">
-            🔧 Tool calling enabled - you can ask about weather and more!
-          </small>
+          
+          <div class="mcp-servers" *ngIf="mcpEnabled">
+            <h4>MCP Servers ({{ getTotalEnabledTools() }} tools):</h4>
+            <div class="server-list-compact">
+              <label 
+                class="server-item-compact" 
+                *ngFor="let server of mcpServers"
+                [title]="server.description + (server.tools ? ' • ' + server.tools.length + ' tools: ' + getToolNames(server.tools) : '')">
+                <input 
+                  type="checkbox" 
+                  [checked]="server.enabled"
+                  (change)="onServerToggle(server.id, $event)">
+                <span class="server-name">{{ server.name }}</span>
+                <span class="server-status-icon" [class]="'status-' + server.status">
+                  {{ getStatusIcon(server.status) }}
+                </span>
+              </label>
+            </div>
+          </div>
         </div>
       </div>
 
