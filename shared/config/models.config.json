@@ -46,12 +46,11 @@
     },
     "MCP": {
       "openrouter.ai": [
-        "meta-llama/llama-4-maverick:free"
-      ],
-      "together.ai": [
-        "deepseek-ai/DeepSeek-R1-Distill-Llama-70B-free",
-        "lgai/exaone-deep-32b",
-        "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
+        "meta-llama/llama-4-maverick:free",
+        "deepseek/deepseek-chat-v3.1:free",
+        "qwen/qwen3-coder:free",
+        "moonshotai/kimi-k2:free",
+        "mistralai/mistral-small-3.2-24b-instruct:free"
       ]
     }
   },

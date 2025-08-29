@@ -444,7 +444,7 @@ export class DashboardComponent implements OnInit {
         // Step 3: Send tool results back to LLM for final contextual response
         const finalResponse = await this.chatService.sendMcpMessage(
           message,
-          this.globalModelSelection.getSelectionForRequest(),
+          mcpModelSelection,
           toolResults
         );
         
