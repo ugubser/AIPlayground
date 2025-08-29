@@ -11,6 +11,9 @@ import { DynamicModelSelection } from '../../services/models-config.service';
 import { McpService } from '../../services/mcp.service';
 import { McpRegistryService, McpServerConfig, McpTool } from '../../services/mcp-registry.service';
 import { APP_CONSTANTS } from '../../config/app-constants';
+import { ErrorHandlerService } from '../../services/error-handler.service';
+import { LoggingService } from '../../services/logging.service';
+import { SharedUtilsService } from '../../utils/shared-utils.service';
 
 interface VisionMessage {
   role: 'user' | 'assistant';
@@ -81,7 +84,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
     private authService: AuthService,
     private globalModelSelection: GlobalModelSelectionService,
     private mcpService: McpService,
-    private mcpRegistry: McpRegistryService
+    private mcpRegistry: McpRegistryService,
+    private errorHandler: ErrorHandlerService,
+    private logger: LoggingService,
+    private utils: SharedUtilsService
   ) {}
 
   private scrollToBottom(container: ElementRef, smooth: boolean = true) {
@@ -98,7 +104,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         const element = container.nativeElement;
         element.scrollTop = element.scrollHeight;
       } catch (fallbackError) {
-        console.debug('Auto-scroll failed:', fallbackError);
+        this.logger.debug('Auto-scroll failed', fallbackError);
       }
     }
   }
@@ -135,7 +141,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         await this.selectSession(this.sessions[0]);
       }
     } catch (error) {
-      console.error('Error loading user data:', error);
+      this.logger.error('Error loading user data', error);
     }
   }
 
@@ -200,7 +206,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       // 5. Associate document with current session if one exists
       if (this.currentSession?.id) {
         await this.chatService.addDocumentToSession(this.currentSession.id, docId);
-        console.log(`Associated document ${docId} with session ${this.currentSession.id}`);
+        this.logger.info('Document associated with session', { docId, sessionId: this.currentSession.id });
         
         // Update current session's associated documents immediately
         if (!this.currentSession.associatedDocuments) {
@@ -223,8 +229,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
       }
       
     } catch (error) {
-      console.error('Error processing file:', error);
-      this.uploadProgress = 'Error processing file. Please try again.';
+      const errorMessage = this.errorHandler.handleDocumentError(error, 'process');
+      this.uploadProgress = errorMessage;
     } finally {
       this.uploading = false;
       const timeoutId = setTimeout(() => {
@@ -250,7 +256,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       }
       // Don't switch tabs - stay on current tab
     } catch (error) {
-      console.error('Error creating session:', error);
+      this.errorHandler.handleSessionError(error, 'create');
     }
   }
 
@@ -263,7 +269,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.scrollToBottomAfterDelay(this.ragMessagesContainer, APP_CONSTANTS.TIMEOUTS.SCROLL_DELAY_EXTENDED);
       }
     } catch (error) {
-      console.error('Error loading messages:', error);
+      this.logger.error('Error loading session messages', { sessionId: session.id, error });
     }
   }
 
@@ -320,12 +326,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       this.scrollToBottomAfterDelay(this.ragMessagesContainer);
       
     } catch (error) {
-      console.error('Error sending message:', error);
-      // Extract Firebase function error message if available
-      let errorContent = 'Sorry, there was an error processing your message. Please try again.';
-      if (error && typeof error === 'object' && 'message' in error) {
-        errorContent = (error as any).message;
-      }
+      const errorContent = this.errorHandler.createChatErrorMessage(error, 'RAG');
       
       // Add error message
       this.messages.push({
@@ -389,13 +390,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       this.scrollToBottomAfterDelay(this.generalMessagesContainer);
       
     } catch (error) {
-      console.error('Error sending general message:', error);
-      
-      // Extract Firebase function error message if available
-      let errorContent = 'Sorry, there was an error processing your message. Please try again.';
-      if (error && typeof error === 'object' && 'message' in error) {
-        errorContent = (error as any).message;
-      }
+      const errorContent = this.errorHandler.createChatErrorMessage(error, 'General');
       
       this.generalMessages.push({
         role: 'assistant',
@@ -424,7 +419,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
             model: currentSelection['mcp'].model
           }
         };
-        console.log('Using MCP provider for tool calling:', mcpModelSelection);
+        this.logger.debug('Using MCP provider for tool calling', mcpModelSelection);
       }
       
       // Step 1: Send message to LLM with available tools
@@ -435,13 +430,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
       
       // Step 2: If LLM requested tool calls, execute them and get final response
       if (mcpResponse.toolCalls && mcpResponse.toolCalls.length > 0) {
-        console.log('LLM requested tool calls:', mcpResponse.toolCalls);
+        this.logger.debug('LLM requested tool calls', mcpResponse.toolCalls);
         
         const toolResults: any[] = [];
         
         for (const toolCall of mcpResponse.toolCalls) {
           try {
-            console.log('Executing tool call:', toolCall);
+            this.logger.debug('Executing tool call', toolCall);
             const result = await this.mcpService.callTool(toolCall);
             const toolOutput = result.content.map(c => c.text).join(' ');
             
@@ -451,7 +446,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
               result: toolOutput
             });
           } catch (toolError) {
-            console.error('Tool call error:', toolError);
+            this.logger.error('Tool call error', toolError);
             toolResults.push({
               toolName: toolCall.name,
               arguments: toolCall.arguments,
@@ -482,13 +477,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       };
       
     } catch (error) {
-      console.error('MCP message error:', error);
-      
-      // Extract Firebase function error message if available
-      let errorContent = 'Sorry, I encountered an error processing your message. Please try again.';
-      if (error && typeof error === 'object' && 'message' in error) {
-        errorContent = (error as any).message;
-      }
+      const errorContent = this.errorHandler.createChatErrorMessage(error, 'MCP');
       
       return {
         role: 'assistant',
@@ -624,12 +613,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       this.visionPrompt = '';
       
     } catch (error) {
-      console.error('Error analyzing image:', error);
-      // Extract Firebase function error message if available
-      let errorContent = 'Sorry, there was an error analyzing your image. Please try again.';
-      if (error && typeof error === 'object' && 'message' in error) {
-        errorContent = (error as any).message;
-      }
+      const errorContent = this.errorHandler.createChatErrorMessage(error, 'Vision');
       
       // Add error message
       this.visionMessages.push({
@@ -672,8 +656,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
       await this.loadUserData();
       
     } catch (error) {
-      console.error('Error deleting document:', error);
-      alert('Failed to delete document. Please try again.');
+      const errorMessage = this.errorHandler.handleDocumentError(error, 'delete');
+      alert(errorMessage);
     } finally {
       this.deleting = null;
     }
@@ -710,7 +694,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       await this.loadUserData();
       
     } catch (error) {
-      console.error('Error adding document to session:', error);
+      this.logger.error('Error adding document to session', { sessionId: this.currentSession.id, docId, error });
       alert('Failed to add document to session. Please try again.');
     }
   }
@@ -731,7 +715,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       await this.loadUserData();
       
     } catch (error) {
-      console.error('Error removing document from session:', error);
+      this.logger.error('Error removing document from session', { sessionId: this.currentSession.id, docId, error });
       alert('Failed to remove document from session. Please try again.');
     }
   }
@@ -794,32 +778,25 @@ export class DashboardComponent implements OnInit, OnDestroy {
       await this.loadUserData();
       
     } catch (error) {
-      console.error('Error deleting session:', error);
-      alert('Failed to delete session. Please try again.');
+      const errorMessage = this.errorHandler.handleSessionError(error, 'delete');
+      alert(errorMessage);
     } finally {
       this.deletingSession = null;
     }
   }
 
   abbreviateTitle(text: string): string {
-    const maxLength = APP_CONSTANTS.UI.MAX_TITLE_LENGTH;
-    const cleaned = text.trim().replace(/\s+/g, ' ');
-    
-    if (cleaned.length <= maxLength) {
-      return cleaned;
-    }
-    
-    return cleaned.substring(0, maxLength).trim() + '...';
+    return this.utils.abbreviateText(text, APP_CONSTANTS.UI.MAX_TITLE_LENGTH);
   }
 
   async onMcpToggle() {
-    console.log('MCP enabled:', this.mcpEnabled);
+    this.logger.info('MCP toggled', { enabled: this.mcpEnabled });
     
     if (this.mcpEnabled) {
       try {
         // Initialize enabled servers
         const enabledServers = this.mcpRegistry.getEnabledServers();
-        console.log('Initializing enabled servers:', enabledServers.map(s => s.name));
+        this.logger.info('Initializing MCP servers', { serverNames: enabledServers.map(s => s.name) });
         
         for (const server of enabledServers) {
           await this.mcpRegistry.initializeServer(server.id);
@@ -827,10 +804,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
         
         // Debug: Check available tools after initialization
         const availableTools = this.mcpRegistry.getAvailableTools();
-        console.log('✅ Available tools after MCP init:', availableTools.length, availableTools.map(t => t.name));
+        this.logger.info('MCP initialization complete', { 
+          toolCount: availableTools.length, 
+          toolNames: availableTools.map(t => t.name) 
+        });
         
       } catch (error) {
-        console.error('Failed to initialize MCP:', error);
+        this.logger.error('Failed to initialize MCP', error);
         this.mcpEnabled = false;
         alert('Failed to connect to MCP servers. Please check server availability.');
       }
@@ -843,9 +823,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
     
     try {
       await this.mcpRegistry.toggleServer(serverId, enabled);
-      console.log(`Server ${serverId} ${enabled ? 'enabled' : 'disabled'}`);
+      this.logger.info('MCP server toggled', { serverId, enabled });
     } catch (error) {
-      console.error('Error toggling server:', error);
+      this.logger.error('Error toggling MCP server', { serverId, enabled, error });
       // Revert checkbox state on error
       checkbox.checked = !enabled;
     }

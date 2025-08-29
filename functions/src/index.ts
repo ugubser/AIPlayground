@@ -3,6 +3,7 @@ import * as admin from 'firebase-admin';
 import fetch from 'node-fetch';
 import { modelsConfigService } from './models-config';
 import { FUNCTION_CONSTANTS } from './config/function-constants';
+import { logger } from './utils/logger';
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -11,7 +12,7 @@ const isEmulator = process.env.FUNCTIONS_EMULATOR === 'true';
 
 // Helper function to handle LLM API errors with specific messaging
 function handleLlmApiError(status: number, errorText: string, provider: string): never {
-  console.error(`${provider} API error:`, status, errorText);
+  logger.error('LLM API Error', { provider, status, errorText });
   
   if (status === 429 && provider === 'openrouter.ai') {
     // Check if it's a rate limit error

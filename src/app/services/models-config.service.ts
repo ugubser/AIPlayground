@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import modelsConfig from '../../../shared/config/models.config.json';
+import { getProviderApiUrl, getApiKeyEnvVar, supportsEmbeddings, getProviderHeaders } from '../utils/model-utils';
 
 export interface ModelConfig {
   [appName: string]: {
@@ -93,36 +94,18 @@ export class ModelsConfigService {
   }
 
   getProviderApiUrl(provider: string, modelType: string): string {
-    const urls: { [key: string]: { [key: string]: string } } = {
-      'openrouter.ai': {
-        'LLM': 'https://openrouter.ai/api/v1/chat/completions',
-        'VISION': 'https://openrouter.ai/api/v1/chat/completions'
-      },
-      'together.ai': {
-        'LLM': 'https://api.together.xyz/v1/chat/completions',
-        'EMBED': 'https://api.together.xyz/v1/embeddings',
-        'VISION': 'https://api.together.xyz/v1/chat/completions'
-      },
-      'ollama': {
-        'LLM': 'http://localhost:11434/api/v1/chat/completions',
-        'EMBED': 'http://localhost:11434/api/embed'
-      }
-    };
-
-    return urls[provider]?.[modelType] || '';
+    return getProviderApiUrl(provider, modelType);
   }
 
-  getProviderHeaders(provider: string, apiKey: string): { [key: string]: string } {
-    const headers: { [key: string]: string } = {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json'
-    };
+  getProviderHeaders(provider: string, apiKey: string, appName?: string): { [key: string]: string } {
+    return getProviderHeaders(provider, apiKey, appName);
+  }
 
-    if (provider === 'openrouter.ai') {
-      headers['HTTP-Referer'] = 'https://aiplayground-6e5be.web.app';
-      headers['X-Title'] = 'Firebase RAG Chatbot';
-    }
+  getApiKeyEnvVar(provider: string): string {
+    return getApiKeyEnvVar(provider);
+  }
 
-    return headers;
+  supportsEmbeddings(provider: string): boolean {
+    return supportsEmbeddings(provider);
   }
 }

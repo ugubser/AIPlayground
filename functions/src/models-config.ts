@@ -1,4 +1,5 @@
 import modelsConfig from './models.config.json';
+import { getProviderApiUrl, getApiKeyEnvVar, supportsEmbeddings, getProviderHeaders } from './utils/model-utils';
 
 export interface ModelConfig {
   [appName: string]: {
@@ -89,51 +90,19 @@ export class ModelsConfigService {
   }
 
   getProviderApiUrl(provider: string, modelType: string): string {
-    const urls: { [key: string]: { [key: string]: string } } = {
-      'openrouter.ai': {
-        'LLM': 'https://openrouter.ai/api/v1/chat/completions',
-        'VISION': 'https://openrouter.ai/api/v1/chat/completions'
-      },
-      'together.ai': {
-        'LLM': 'https://api.together.xyz/v1/chat/completions',
-        'EMBED': 'https://api.together.xyz/v1/embeddings',
-        'VISION': 'https://api.together.xyz/v1/chat/completions'
-      },
-      'ollama': {
-        'LLM': 'http://localhost:11434/api/v1/chat/completions',
-        'EMBED': 'http://localhost:11434/api/embed'
-      }
-    };
-
-    return urls[provider]?.[modelType] || '';
+    return getProviderApiUrl(provider, modelType);
   }
 
   getProviderHeaders(provider: string, apiKey: string, appName?: string): { [key: string]: string } {
-    const headers: { [key: string]: string } = {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json'
-    };
-
-    if (provider === 'openrouter.ai') {
-      headers['HTTP-Referer'] = 'https://aiplayground-6e5be.web.app';
-      headers['X-Title'] = appName === 'chat' ? 'Vanguard Signals AI Playground' : 'Firebase RAG Chatbot';
-    }
-
-    return headers;
+    return getProviderHeaders(provider, apiKey, appName);
   }
 
   getApiKeyEnvVar(provider: string): string {
-    const envVars: { [key: string]: string } = {
-      'together.ai': 'TOGETHER_API_KEY',
-      'openrouter.ai': 'OPENROUTER_API_KEY',
-      'ollama': 'OLLAMA_API_KEY'
-    };
-
-    return envVars[provider] || 'UNKNOWN_API_KEY';
+    return getApiKeyEnvVar(provider);
   }
 
   supportsEmbeddings(provider: string): boolean {
-    return ['together.ai', 'ollama'].includes(provider);
+    return supportsEmbeddings(provider);
   }
 }
 

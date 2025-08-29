@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import * as pdfjsLib from 'pdfjs-dist';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { APP_CONSTANTS } from '../config/app-constants';
+import { LoggingService } from './logging.service';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = '/assets/pdf.worker.min.js';
 
@@ -16,7 +17,7 @@ export interface ChunkData {
 })
 export class PdfProcessorService {
 
-  constructor() { }
+  constructor(private logger: LoggingService) { }
 
   async pdfToTextByPage(file: File): Promise<string[]> {
     const buf = await file.arrayBuffer();
@@ -67,16 +68,23 @@ export class PdfProcessorService {
 
   async processPdfFile(file: File): Promise<ChunkData[]> {
     try {
-      console.log(`Processing PDF: ${file.name}`);
+      this.logger.info('Processing PDF file', { filename: file.name, size: file.size });
+      const startTime = Date.now();
+      
       const pages = await this.pdfToTextByPage(file);
-      console.log(`Extracted text from ${pages.length} pages`);
+      this.logger.debug('PDF text extraction complete', { pageCount: pages.length });
       
       const chunks = await this.chunkPages(pages);
-      console.log(`Created ${chunks.length} chunks`);
+      
+      this.logger.logPerformance('PDF Processing', startTime, { 
+        filename: file.name, 
+        pageCount: pages.length, 
+        chunkCount: chunks.length 
+      });
       
       return chunks;
     } catch (error) {
-      console.error('Error processing PDF:', error);
+      this.logger.error('Error processing PDF', { filename: file.name, error });
       throw error;
     }
   }
