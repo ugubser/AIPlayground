@@ -190,10 +190,16 @@ export class ChatService {
     } catch (error) {
       console.error('Error getting RAG response:', error);
       
+      // Extract Firebase function error message if available
+      let errorContent = 'Sorry, I encountered an error processing your question. Please try again.';
+      if (error && typeof error === 'object' && 'message' in error) {
+        errorContent = (error as any).message;
+      }
+      
       // Save error message
       const errorMessage: Omit<ChatMessage, 'id'> = {
         role: 'assistant',
-        content: 'Sorry, I encountered an error processing your question. Please try again.',
+        content: errorContent,
         createdAt: new Date()
       };
 
@@ -242,9 +248,15 @@ export class ChatService {
     } catch (error) {
       console.error('Error getting general chat response:', error);
       
+      // Extract Firebase function error message if available
+      let errorContent = 'Sorry, I encountered an error processing your question. Please try again.';
+      if (error && typeof error === 'object' && 'message' in error) {
+        errorContent = (error as any).message;
+      }
+      
       return {
         role: 'assistant',
-        content: 'Sorry, I encountered an error processing your question. Please try again.',
+        content: errorContent,
         createdAt: new Date()
       };
     }

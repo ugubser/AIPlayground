@@ -8,6 +8,29 @@ const db = admin.firestore();
 
 const isEmulator = process.env.FUNCTIONS_EMULATOR === 'true';
 
+// Helper function to handle LLM API errors with specific messaging
+function handleLlmApiError(status: number, errorText: string, provider: string): never {
+  console.error(`${provider} API error:`, status, errorText);
+  
+  if (status === 429 && provider === 'openrouter.ai') {
+    // Check if it's a rate limit error
+    try {
+      const errorData = JSON.parse(errorText);
+      if (errorData.error?.metadata?.raw?.includes('rate-limited upstream')) {
+        throw new functions.https.HttpsError('resource-exhausted', 'This model is rate limited, please choose a different model');
+      }
+    } catch (parseError) {
+      // If we can't parse the error, check if the text contains rate limit indicators
+      if (errorText.includes('rate-limited') || errorText.includes('rate limit')) {
+        throw new functions.https.HttpsError('resource-exhausted', 'This model is rate limited, please choose a different model');
+      }
+    }
+  }
+  
+  // Default error message for other errors
+  throw new functions.https.HttpsError('internal', 'Failed to generate response');
+}
+
 // OpenMeteo geocoding function
 async function getCityCoordinates(cityName: string): Promise<{ lat: number; lon: number; name: string } | null> {
   try {
@@ -603,8 +626,7 @@ export const chatRag = functions
 
       if (!llmResponse.ok) {
         const errorText = await llmResponse.text();
-        console.error(`${actualLlmProvider} API error:`, llmResponse.status, errorText);
-        throw new functions.https.HttpsError('internal', 'Failed to generate response');
+        handleLlmApiError(llmResponse.status, errorText, actualLlmProvider);
       }
 
       const llmJson = await llmResponse.json() as any;
@@ -720,8 +742,7 @@ export const generalChat = functions
 
       if (!llmResponse.ok) {
         const errorText = await llmResponse.text();
-        console.error('LLM API error:', llmResponse.status, errorText);
-        throw new functions.https.HttpsError('internal', 'Failed to generate response');
+        handleLlmApiError(llmResponse.status, errorText, actualLlmProvider);
       }
 
       const llmJson = await llmResponse.json() as any;
@@ -879,8 +900,7 @@ export const mcpChat = functions
 
       if (!llmResponse.ok) {
         const errorText = await llmResponse.text();
-        console.error('LLM API error:', llmResponse.status, errorText);
-        throw new functions.https.HttpsError('internal', 'Failed to generate response');
+        handleLlmApiError(llmResponse.status, errorText, actualLlmProvider);
       }
 
       const llmJson = await llmResponse.json() as any;

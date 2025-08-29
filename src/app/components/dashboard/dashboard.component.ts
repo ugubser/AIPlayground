@@ -315,10 +315,16 @@ export class DashboardComponent implements OnInit {
       
     } catch (error) {
       console.error('Error sending message:', error);
+      // Extract Firebase function error message if available
+      let errorContent = 'Sorry, there was an error processing your message. Please try again.';
+      if (error && typeof error === 'object' && 'message' in error) {
+        errorContent = (error as any).message;
+      }
+      
       // Add error message
       this.messages.push({
         role: 'assistant',
-        content: 'Sorry, there was an error processing your message. Please try again.',
+        content: errorContent,
         createdAt: new Date()
       });
       
@@ -378,9 +384,16 @@ export class DashboardComponent implements OnInit {
       
     } catch (error) {
       console.error('Error sending general message:', error);
+      
+      // Extract Firebase function error message if available
+      let errorContent = 'Sorry, there was an error processing your message. Please try again.';
+      if (error && typeof error === 'object' && 'message' in error) {
+        errorContent = (error as any).message;
+      }
+      
       this.generalMessages.push({
         role: 'assistant',
-        content: 'Sorry, there was an error processing your message. Please try again.',
+        content: errorContent,
         createdAt: new Date()
       });
       
@@ -464,9 +477,16 @@ export class DashboardComponent implements OnInit {
       
     } catch (error) {
       console.error('MCP message error:', error);
+      
+      // Extract Firebase function error message if available
+      let errorContent = 'Sorry, I encountered an error processing your message. Please try again.';
+      if (error && typeof error === 'object' && 'message' in error) {
+        errorContent = (error as any).message;
+      }
+      
       return {
         role: 'assistant',
-        content: 'Sorry, I encountered an error processing your message. Please try again.',
+        content: errorContent,
         createdAt: new Date()
       };
     }
@@ -599,10 +619,16 @@ export class DashboardComponent implements OnInit {
       
     } catch (error) {
       console.error('Error analyzing image:', error);
+      // Extract Firebase function error message if available
+      let errorContent = 'Sorry, there was an error analyzing your image. Please try again.';
+      if (error && typeof error === 'object' && 'message' in error) {
+        errorContent = (error as any).message;
+      }
+      
       // Add error message
       this.visionMessages.push({
         role: 'assistant',
-        content: 'Sorry, there was an error analyzing your image. Please try again.',
+        content: errorContent,
         createdAt: new Date()
       });
       
