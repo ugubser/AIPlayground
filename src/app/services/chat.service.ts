@@ -54,6 +54,13 @@ export class ChatService {
     imageData: string;
   }, { answer: string }>(this.functions, 'visionChat');
 
+  private mcpChat = httpsCallable<{
+    message: string;
+    tools?: any[];
+    llmProvider?: string;
+    llmModel?: string;
+  }, { answer: string; toolCalls?: any[] }>(this.functions, 'mcpChat');
+
   constructor(
     private firestore: Firestore,
     private functions: Functions,
@@ -345,5 +352,49 @@ export class ChatService {
   async updateSessionTitle(sessionId: string, title: string): Promise<void> {
     const sessionRef = doc(this.firestore, `sessions/${sessionId}`);
     await updateDoc(sessionRef, { title });
+  }
+
+  async sendMcpMessage(message: string, modelSelection?: DynamicModelSelection, toolResults?: any[]): Promise<{ answer: string; toolCalls?: MCPToolCall[] }> {
+    if (!this.auth.currentUser) {
+      throw new Error('User not authenticated');
+    }
+
+    try {
+      const mcpRequest: any = {
+        message
+      };
+
+      // Add tools only on initial request (not follow-up)
+      if (!toolResults) {
+        const tools = await this.mcpService.getTools();
+        mcpRequest.tools = tools;
+      } else {
+        // This is a follow-up request with tool results
+        mcpRequest.toolResults = toolResults;
+      }
+
+      // Add model selection if provided
+      if (modelSelection && modelSelection['llm']) {
+        mcpRequest.llmProvider = modelSelection['llm'].provider;
+        mcpRequest.llmModel = modelSelection['llm'].model;
+        console.log('Chat service sending MCP request:', {
+          llmProvider: mcpRequest.llmProvider,
+          llmModel: mcpRequest.llmModel,
+          isFollowUp: !!toolResults,
+          toolCount: mcpRequest.tools?.length || 0
+        });
+      }
+
+      const { data } = await this.mcpChat(mcpRequest);
+
+      return {
+        answer: data.answer,
+        toolCalls: data.toolCalls as MCPToolCall[]
+      };
+
+    } catch (error) {
+      console.error('Error getting MCP chat response:', error);
+      throw error;
+    }
   }
 }

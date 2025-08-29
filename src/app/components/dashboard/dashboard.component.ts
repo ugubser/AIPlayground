@@ -377,82 +377,71 @@ export class DashboardComponent implements OnInit {
   }
 
   private async sendMcpMessage(message: string): Promise<ChatMessage> {
-    // Check for weather-related keywords
-    const isWeatherQuery = message.toLowerCase().includes('weather');
-    
-    if (isWeatherQuery) {
-      // Extract city from message using simple regex patterns
-      const city = this.extractCityFromMessage(message);
-      
-      try {
-        const toolResult = await this.mcpService.callTool({
-          name: 'get_weather',
-          arguments: { city }
-        });
-        
-        const weatherInfo = toolResult.content.map(c => c.text).join(' ');
-        
-        return {
-          role: 'assistant',
-          content: `I'll check the weather for you using my weather tool.\n\n${weatherInfo}`,
-          createdAt: new Date()
-        };
-      } catch (error) {
-        console.error('MCP tool call failed:', error);
-        return {
-          role: 'assistant',
-          content: 'Sorry, I encountered an error calling the weather tool. Please try again.',
-          createdAt: new Date()
-        };
-      }
-    } else {
-      // For non-weather queries, use regular LLM
-      return await this.chatService.sendGeneralMessage(
+    try {
+      // Step 1: Send message to LLM with available tools
+      const mcpResponse = await this.chatService.sendMcpMessage(
         message,
         this.globalModelSelection.getSelectionForRequest()
       );
+      
+      // Step 2: If LLM requested tool calls, execute them and get final response
+      if (mcpResponse.toolCalls && mcpResponse.toolCalls.length > 0) {
+        console.log('LLM requested tool calls:', mcpResponse.toolCalls);
+        
+        const toolResults: any[] = [];
+        
+        for (const toolCall of mcpResponse.toolCalls) {
+          try {
+            console.log('Executing tool call:', toolCall);
+            const result = await this.mcpService.callTool(toolCall);
+            const toolOutput = result.content.map(c => c.text).join(' ');
+            
+            toolResults.push({
+              toolName: toolCall.name,
+              arguments: toolCall.arguments,
+              result: toolOutput
+            });
+          } catch (toolError) {
+            console.error('Tool call error:', toolError);
+            toolResults.push({
+              toolName: toolCall.name,
+              arguments: toolCall.arguments,
+              result: `Error: ${toolError}`
+            });
+          }
+        }
+        
+        // Step 3: Send tool results back to LLM for final contextual response
+        const finalResponse = await this.chatService.sendMcpMessage(
+          message,
+          this.globalModelSelection.getSelectionForRequest(),
+          toolResults
+        );
+        
+        return {
+          role: 'assistant',
+          content: finalResponse.answer,
+          createdAt: new Date()
+        };
+      }
+      
+      // No tool calls, return LLM response directly
+      return {
+        role: 'assistant',
+        content: mcpResponse.answer,
+        createdAt: new Date()
+      };
+      
+    } catch (error) {
+      console.error('MCP message error:', error);
+      return {
+        role: 'assistant',
+        content: 'Sorry, I encountered an error processing your message. Please try again.',
+        createdAt: new Date()
+      };
     }
   }
 
-  private extractCityFromMessage(message: string): string {
-    const lowerMessage = message.toLowerCase();
-    
-    // Common patterns for weather queries
-    const patterns = [
-      /weather in ([^?,.!]+)/,
-      /weather for ([^?,.!]+)/,
-      /weather at ([^?,.!]+)/,
-      /weather of ([^?,.!]+)/,
-      /([^?,.!\s]+)'s weather/,
-      /([^?,.!\s]+) weather/
-    ];
-    
-    for (const pattern of patterns) {
-      const match = lowerMessage.match(pattern);
-      if (match && match[1]) {
-        return match[1].trim();
-      }
-    }
-    
-    // Fallback: look for city names after common prepositions
-    const words = lowerMessage.split(/\s+/);
-    const weatherIndex = words.findIndex(word => word.includes('weather'));
-    
-    if (weatherIndex !== -1) {
-      // Look for city names around the weather keyword
-      const candidates = [
-        words[weatherIndex + 1],  // "weather Singapore"
-        words[weatherIndex - 1],  // "Singapore weather"
-      ].filter(Boolean);
-      
-      if (candidates.length > 0) {
-        return candidates[0];
-      }
-    }
-    
-    // Last resort: return the whole message and let the geocoding API handle it
-    return message.replace(/weather|what's|what|is|the|in|for|at|of|\?|!|\./gi, '').trim() || 'unknown city';
-  }
 
   onGeneralEnterKey(event: KeyboardEvent) {
     if (event.key === 'Enter' && !event.shiftKey) {

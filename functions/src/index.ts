@@ -50,10 +50,23 @@ async function getCityCoordinates(cityName: string): Promise<{ lat: number; lon:
   }
 }
 
+function interpretWeatherCode(weatherCode: number): string {
+  if (weatherCode === 0) return 'Clear sky';
+  else if (weatherCode <= 3) return 'Partly cloudy';
+  else if (weatherCode <= 48) return 'Foggy';
+  else if (weatherCode <= 57) return 'Drizzle';
+  else if (weatherCode <= 67) return 'Rain';
+  else if (weatherCode <= 77) return 'Snow';
+  else if (weatherCode <= 82) return 'Rain showers';
+  else if (weatherCode <= 86) return 'Snow showers';
+  else if (weatherCode <= 99) return 'Thunderstorm';
+  return 'Clear';
+}
+
 async function getWeatherData(lat: number, lon: number): Promise<string> {
   try {
     if (isEmulator) {
-      console.log('🌤️ Fetching weather data for coordinates:', { lat, lon });
+      console.log('🌤️ Fetching current weather for coordinates:', { lat, lon });
     }
 
     const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&timezone=auto`;
@@ -78,28 +91,76 @@ async function getWeatherData(lat: number, lon: number): Promise<string> {
     const weatherCode = current.weather_code || 0;
     const windSpeed = Math.round(current.wind_speed_10m || 0);
     
-    // WMO Weather interpretation codes
-    let condition = 'Clear';
-    if (weatherCode === 0) condition = 'Clear sky';
-    else if (weatherCode <= 3) condition = 'Partly cloudy';
-    else if (weatherCode <= 48) condition = 'Foggy';
-    else if (weatherCode <= 57) condition = 'Drizzle';
-    else if (weatherCode <= 67) condition = 'Rain';
-    else if (weatherCode <= 77) condition = 'Snow';
-    else if (weatherCode <= 82) condition = 'Rain showers';
-    else if (weatherCode <= 86) condition = 'Snow showers';
-    else if (weatherCode <= 99) condition = 'Thunderstorm';
-    
+    const condition = interpretWeatherCode(weatherCode);
     const weatherDescription = `${condition}, ${temperature}°C, ${humidity}% humidity, ${windSpeed} km/h wind`;
     
     if (isEmulator) {
-      console.log('🌤️ Weather result:', { weatherCode, temperature, humidity, windSpeed, condition });
+      console.log('🌤️ Current weather result:', { weatherCode, temperature, humidity, windSpeed, condition });
     }
     
     return weatherDescription;
   } catch (error) {
     console.error('Error fetching weather data:', error);
     return 'Weather data unavailable';
+  }
+}
+
+async function getForecastData(lat: number, lon: number): Promise<string> {
+  try {
+    if (isEmulator) {
+      console.log('🌤️ Fetching 7-day forecast for coordinates:', { lat, lon });
+    }
+
+    const forecastUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=auto&forecast_days=7`;
+    
+    const response = await fetch(forecastUrl);
+    
+    if (!response.ok) {
+      console.error('Forecast API error:', response.status, response.statusText);
+      return 'Forecast data unavailable';
+    }
+    
+    const data = await response.json() as any;
+    const daily = data.daily;
+    
+    if (!daily || !daily.time) {
+      console.error('No daily forecast data in response');
+      return 'Forecast data unavailable';
+    }
+    
+    const forecastLines: string[] = [];
+    
+    for (let i = 0; i < Math.min(7, daily.time.length); i++) {
+      const date = new Date(daily.time[i]).toLocaleDateString('en-US', { 
+        weekday: 'short', 
+        month: 'short', 
+        day: 'numeric' 
+      });
+      const maxTemp = Math.round(daily.temperature_2m_max[i] || 0);
+      const minTemp = Math.round(daily.temperature_2m_min[i] || 0);
+      const weatherCode = daily.weather_code[i] || 0;
+      const precipitation = Math.round((daily.precipitation_sum[i] || 0) * 10) / 10;
+      
+      const condition = interpretWeatherCode(weatherCode);
+      
+      let line = `${date}: ${condition}, ${maxTemp}°/${minTemp}°C`;
+      if (precipitation > 0) {
+        line += `, ${precipitation}mm rain`;
+      }
+      
+      forecastLines.push(line);
+    }
+    
+    const forecastDescription = '7-day forecast:\n' + forecastLines.join('\n');
+    
+    if (isEmulator) {
+      console.log('🌤️ Forecast result:', forecastLines.length, 'days');
+    }
+    
+    return forecastDescription;
+  } catch (error) {
+    console.error('Error fetching forecast data:', error);
+    return 'Forecast data unavailable';
   }
 }
 
@@ -694,6 +755,183 @@ export const generalChat = functions
     }
   });
 
+export const mcpChat = functions
+  .runWith({ timeoutSeconds: 60, memory: '1GB' })
+  .https.onCall(async (data, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError('unauthenticated', 'Login required');
+    }
+
+    const { message, llmProvider, llmModel, tools, toolResults } = data;
+
+    // Use provided models from UI
+    const defaults = modelsConfigService.getDefaultSelection('chat') as any;
+    const actualLlmProvider = llmProvider || defaults?.llm?.provider || 'openrouter.ai';
+    const actualLlmModel = llmModel || defaults?.llm?.model || 'meta-llama/llama-4-maverick:free';
+
+    console.log('MCP Chat request:', { 
+      actualLlmProvider, 
+      actualLlmModel, 
+      toolsCount: tools?.length || 0,
+      hasToolResults: !!toolResults?.length 
+    });
+
+    if (!message) {
+      throw new functions.https.HttpsError('invalid-argument', 'message required');
+    }
+
+    try {
+      // Get LLM API key
+      const llmApiKeyEnvVar = modelsConfigService.getApiKeyEnvVar(actualLlmProvider);
+      const llmKey = process.env[llmApiKeyEnvVar];
+      
+      if (!llmKey) {
+        console.error(`${llmApiKeyEnvVar} not found`);
+        throw new functions.https.HttpsError('internal', `${llmApiKeyEnvVar} not configured`);
+      }
+
+      const llmApiUrl = modelsConfigService.getProviderApiUrl(actualLlmProvider, 'LLM');
+      if (!llmApiUrl) {
+        throw new functions.https.HttpsError('internal', `No API URL configured for provider ${actualLlmProvider}`);
+      }
+
+      // Build conversation with tool results if provided
+      const messages: any[] = [{ role: 'user', content: message }];
+      
+      // If we have tool results, this is a follow-up call after tool execution
+      if (toolResults && toolResults.length > 0) {
+        // Add the assistant's tool calls
+        messages.push({
+          role: 'assistant',
+          tool_calls: toolResults.map((result: any) => ({
+            id: `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            type: 'function',
+            function: {
+              name: result.toolName,
+              arguments: JSON.stringify(result.arguments)
+            }
+          }))
+        });
+        
+        // Add tool results
+        toolResults.forEach((result: any) => {
+          messages.push({
+            role: 'tool',
+            tool_call_id: `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            name: result.toolName,
+            content: result.result
+          });
+        });
+      }
+
+      // Prepare request body
+      const llmRequestBody: any = {
+        model: actualLlmModel,
+        messages: messages,
+        temperature: 0.7,
+        max_tokens: 2000
+      };
+
+      // Add tools for supported providers (only on initial request)
+      if (tools && tools.length > 0 && !toolResults) {
+        if (actualLlmProvider === 'openrouter.ai') {
+          llmRequestBody.tools = tools.map((tool: any) => ({
+            type: 'function',
+            function: {
+              name: tool.name,
+              description: tool.description,
+              parameters: tool.inputSchema
+            }
+          }));
+          llmRequestBody.tool_choice = 'auto';
+        } else if (actualLlmProvider === 'together.ai') {
+          llmRequestBody.tools = tools.map((tool: any) => ({
+            type: 'function',
+            function: {
+              name: tool.name,
+              description: tool.description,
+              parameters: tool.inputSchema
+            }
+          }));
+          llmRequestBody.tool_choice = 'auto';
+        }
+      }
+
+      const llmHeaders = modelsConfigService.getProviderHeaders(actualLlmProvider, llmKey, 'chat');
+
+      if (isEmulator) {
+        console.log('🔍 MCP Chat LLM Request:', JSON.stringify({
+          provider: actualLlmProvider,
+          model: actualLlmModel,
+          url: llmApiUrl,
+          hasTools: !!tools?.length && !toolResults,
+          toolCount: tools?.length || 0,
+          messageCount: messages.length,
+          isFollowUp: !!toolResults
+        }, null, 2));
+      }
+
+      const llmResponse = await fetch(llmApiUrl, {
+        method: 'POST',
+        headers: llmHeaders,
+        body: JSON.stringify(llmRequestBody)
+      });
+
+      if (!llmResponse.ok) {
+        const errorText = await llmResponse.text();
+        console.error('LLM API error:', llmResponse.status, errorText);
+        throw new functions.https.HttpsError('internal', 'Failed to generate response');
+      }
+
+      const llmJson = await llmResponse.json() as any;
+      const choice = llmJson.choices?.[0];
+      
+      if (!choice) {
+        throw new functions.https.HttpsError('internal', 'No response from LLM');
+      }
+
+      const message_content = choice.message;
+      
+      // Check if LLM wants to use tools (only on initial request)
+      if (!toolResults && message_content.tool_calls && message_content.tool_calls.length > 0) {
+        const toolCalls = message_content.tool_calls.map((tc: any) => ({
+          name: tc.function.name,
+          arguments: typeof tc.function.arguments === 'string' 
+            ? JSON.parse(tc.function.arguments) 
+            : tc.function.arguments
+        }));
+
+        return {
+          answer: message_content.content || 'I need to use some tools to answer your question.',
+          toolCalls: toolCalls
+        };
+      }
+
+      // Regular response (either no tools or post-tool execution)
+      const answer = message_content.content ?? 'Sorry, I could not generate a response.';
+
+      if (isEmulator) {
+        console.log('📤 MCP Chat LLM Response:', JSON.stringify({
+          provider: actualLlmProvider,
+          model: actualLlmModel,
+          status: llmResponse.status,
+          hasToolCalls: !!message_content.tool_calls?.length,
+          answerLength: answer.length,
+          isFollowUp: !!toolResults
+        }, null, 2));
+      }
+
+      return { answer };
+
+    } catch (error) {
+      console.error('Error in mcpChat:', error);
+      if (error instanceof functions.https.HttpsError) {
+        throw error;
+      }
+      throw new functions.https.HttpsError('internal', 'Failed to process MCP chat request');
+    }
+  });
+
 export const visionChat = functions
   .runWith({ timeoutSeconds: 60, memory: '1GB' })
   .https.onCall(async (data, context) => {
@@ -1085,6 +1323,20 @@ export const mcpWeatherServer = functions
                   },
                   required: ['city']
                 }
+              },
+              {
+                name: 'get_forecast',
+                description: 'Get 7-day weather forecast for a city',
+                inputSchema: {
+                  type: 'object',
+                  properties: {
+                    city: {
+                      type: 'string',
+                      description: 'The city to get forecast for'
+                    }
+                  },
+                  required: ['city']
+                }
               }
             ]
           }
@@ -1163,6 +1415,77 @@ export const mcpWeatherServer = functions
               error: {
                 code: -32603,
                 message: 'Failed to get weather data'
+              }
+            };
+            res.json(errorResponse);
+            return;
+          }
+        }
+
+        if (name === 'get_forecast') {
+          const city = toolArgs?.city || '';
+          
+          if (!city) {
+            const errorResponse = {
+              jsonrpc: '2.0',
+              id: id || 1,
+              error: {
+                code: -32602,
+                message: 'City parameter is required'
+              }
+            };
+            res.json(errorResponse);
+            return;
+          }
+
+          try {
+            // Get coordinates for the city
+            const coordinates = await getCityCoordinates(city);
+            
+            if (!coordinates) {
+              const callResponse = {
+                jsonrpc: '2.0',
+                id: id || 1,
+                result: {
+                  content: [
+                    {
+                      type: 'text',
+                      text: `Sorry, I couldn't find coordinates for "${city}". Please try a major city name.`
+                    }
+                  ]
+                }
+              };
+              res.json(callResponse);
+              return;
+            }
+
+            // Get forecast data
+            const forecast = await getForecastData(coordinates.lat, coordinates.lon);
+            
+            const callResponse = {
+              jsonrpc: '2.0',
+              id: id || 1,
+              result: {
+                content: [
+                  {
+                    type: 'text',
+                    text: `7-day forecast for ${coordinates.name}:\n\n${forecast}`
+                  }
+                ]
+              }
+            };
+
+            res.json(callResponse);
+            return;
+
+          } catch (error) {
+            console.error('Error getting forecast:', error);
+            const errorResponse = {
+              jsonrpc: '2.0',
+              id: id || 1,
+              error: {
+                code: -32603,
+                message: 'Failed to get forecast data'
               }
             };
             res.json(errorResponse);
