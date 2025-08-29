@@ -927,3 +927,188 @@ export const deleteSession = functions
       throw new functions.https.HttpsError('internal', 'Failed to delete session');
     }
   });
+
+// MCP Weather Server (SSE-based for web clients)
+export const mcpWeatherServer = functions
+  .runWith({ timeoutSeconds: 540, memory: '1GB' })
+  .https.onRequest(async (req, res) => {
+    // Set CORS headers
+    res.set({
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive'
+    });
+
+    if (req.method === 'OPTIONS') {
+      res.status(200).end();
+      return;
+    }
+
+    console.log(`MCP Weather Server: ${req.method} ${req.url}`);
+
+    try {
+      // Handle MCP protocol initialization
+      if (req.method === 'POST' && req.url === '/initialize') {
+        const initResponse = {
+          jsonrpc: '2.0',
+          id: req.body?.id || 1,
+          result: {
+            protocolVersion: '2024-11-05',
+            capabilities: {
+              tools: {}
+            },
+            serverInfo: {
+              name: 'weather-server',
+              version: '1.0.0'
+            }
+          }
+        };
+
+        res.json(initResponse);
+        return;
+      }
+
+      // Handle tools list request
+      if (req.method === 'POST' && req.url === '/tools/list') {
+        const toolsResponse = {
+          jsonrpc: '2.0',
+          id: req.body?.id || 1,
+          result: {
+            tools: [
+              {
+                name: 'get_weather',
+                description: 'Get current weather for a city',
+                inputSchema: {
+                  type: 'object',
+                  properties: {
+                    city: {
+                      type: 'string',
+                      description: 'The city to get weather for'
+                    }
+                  },
+                  required: ['city']
+                }
+              }
+            ]
+          }
+        };
+
+        res.json(toolsResponse);
+        return;
+      }
+
+      // Handle tool execution
+      if (req.method === 'POST' && req.url === '/tools/call') {
+        const { id, params } = req.body || {};
+        const { name, arguments: toolArgs } = params || {};
+
+        if (name === 'get_weather') {
+          const city = toolArgs?.city || '';
+          let weather = 'Dim';
+
+          if (city.toLowerCase().includes('new york')) {
+            weather = 'Sunny';
+          } else if (city.toLowerCase().includes('zurich')) {
+            weather = 'Rainy';
+          }
+
+          const callResponse = {
+            jsonrpc: '2.0',
+            id: id || 1,
+            result: {
+              content: [
+                {
+                  type: 'text',
+                  text: `The weather in ${city} is ${weather}`
+                }
+              ]
+            }
+          };
+
+          res.json(callResponse);
+          return;
+        }
+
+        // Unknown tool
+        const errorResponse = {
+          jsonrpc: '2.0',
+          id: id || 1,
+          error: {
+            code: -32601,
+            message: `Unknown tool: ${name}`
+          }
+        };
+
+        res.json(errorResponse);
+        return;
+      }
+
+      // SSE endpoint for real-time communication (for Angular UI)
+      if (req.method === 'GET' && req.url === '/events') {
+        res.set('Content-Type', 'text/event-stream');
+        
+        // Send initial connection message
+        const welcomeMessage = {
+          type: 'server_info',
+          data: {
+            name: 'MCP Weather Server',
+            version: '1.0.0',
+            capabilities: ['tools'],
+            endpoint: 'weather'
+          }
+        };
+
+        res.write(`data: ${JSON.stringify(welcomeMessage)}\n\n`);
+
+        // Keep connection alive with heartbeat
+        const heartbeat = setInterval(() => {
+          res.write(`data: ${JSON.stringify({ type: 'heartbeat', timestamp: Date.now() })}\n\n`);
+        }, 30000);
+
+        // Clean up on client disconnect
+        req.on('close', () => {
+          clearInterval(heartbeat);
+          console.log('MCP SSE client disconnected');
+        });
+
+        return;
+      }
+
+      // Server info endpoint
+      if (req.method === 'GET') {
+        res.json({
+          name: 'MCP Weather Server',
+          version: '1.0.0',
+          protocol: 'MCP/2024-11-05',
+          capabilities: ['tools'],
+          endpoints: {
+            initialize: 'POST /initialize',
+            tools_list: 'POST /tools/list',
+            tools_call: 'POST /tools/call',
+            events: 'GET /events'
+          }
+        });
+        return;
+      }
+
+      // Method not supported
+      res.status(405).json({ error: 'Method not allowed' });
+
+    } catch (error) {
+      console.error('Error in MCP Weather Server:', error);
+      
+      const errorResponse = {
+        jsonrpc: '2.0',
+        id: 1,
+        error: {
+          code: -32603,
+          message: 'Internal error',
+          data: isEmulator ? (error instanceof Error ? error.message : String(error)) : 'Server error'
+        }
+      };
+
+      res.json(errorResponse);
+    }
+  });

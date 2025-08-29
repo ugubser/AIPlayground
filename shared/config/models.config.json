@@ -43,6 +43,16 @@
         "lgai/exaone-deep-32b",
         "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
       ]
+    },
+    "MCP": {
+      "openrouter.ai": [
+        "meta-llama/llama-4-maverick:free"
+      ],
+      "together.ai": [
+        "deepseek-ai/DeepSeek-R1-Distill-Llama-70B-free",
+        "lgai/exaone-deep-32b",
+        "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
+      ]
     }
   },
   "vision": {

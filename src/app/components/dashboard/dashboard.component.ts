@@ -8,6 +8,7 @@ import { ChatService, ChatSession, ChatMessage } from '../../services/chat.servi
 import { AuthService } from '../../services/auth.service';
 import { GlobalModelSelectionService } from '../../services/global-model-selection.service';
 import { DynamicModelSelection } from '../../services/models-config.service';
+import { McpService, MCPTool } from '../../services/mcp.service';
 
 interface VisionMessage {
   role: 'user' | 'assistant';
@@ -50,6 +51,10 @@ export class DashboardComponent implements OnInit {
   generalMessageInput = '';
   sendingGeneral = false;
 
+  // MCP (Model Context Protocol) settings
+  mcpEnabled = false;
+  availableTools: MCPTool[] = [];
+
   // UI State
   activeTab: 'rag' | 'chat' | 'vision' = 'rag';
   dragOver = false;
@@ -68,7 +73,8 @@ export class DashboardComponent implements OnInit {
     private documentService: DocumentService,
     private chatService: ChatService,
     private authService: AuthService,
-    private globalModelSelection: GlobalModelSelectionService
+    private globalModelSelection: GlobalModelSelectionService,
+    private mcpService: McpService
   ) {}
 
   private scrollToBottom(container: ElementRef, smooth: boolean = true) {
@@ -337,11 +343,18 @@ export class DashboardComponent implements OnInit {
     this.scrollToBottomAfterDelay(this.generalMessagesContainer);
 
     try {
-      // Use chat service for general conversation (no document context)
-      const response = await this.chatService.sendGeneralMessage(
-        messageText,
-        this.globalModelSelection.getSelectionForRequest()
-      );
+      let response: ChatMessage;
+      
+      if (this.mcpEnabled) {
+        // Use MCP-enabled chat with tool calling capability
+        response = await this.sendMcpMessage(messageText);
+      } else {
+        // Use regular general chat
+        response = await this.chatService.sendGeneralMessage(
+          messageText,
+          this.globalModelSelection.getSelectionForRequest()
+        );
+      }
       
       this.generalMessages.push(response);
       
@@ -363,6 +376,46 @@ export class DashboardComponent implements OnInit {
     }
   }
 
+  private async sendMcpMessage(message: string): Promise<ChatMessage> {
+    // For now, simulate tool calling by checking for weather-related keywords
+    const isWeatherQuery = message.toLowerCase().includes('weather');
+    
+    if (isWeatherQuery) {
+      // Extract city from message (simple approach)
+      let city = 'unknown';
+      if (message.toLowerCase().includes('new york')) city = 'New York';
+      else if (message.toLowerCase().includes('zurich')) city = 'Zurich';
+      
+      try {
+        const toolResult = await this.mcpService.callTool({
+          name: 'get_weather',
+          arguments: { city }
+        });
+        
+        const weatherInfo = toolResult.content.map(c => c.text).join(' ');
+        
+        return {
+          role: 'assistant',
+          content: `I'll check the weather for you using my weather tool.\n\n${weatherInfo}`,
+          createdAt: new Date()
+        };
+      } catch (error) {
+        console.error('MCP tool call failed:', error);
+        return {
+          role: 'assistant',
+          content: 'Sorry, I encountered an error calling the weather tool. Please try again.',
+          createdAt: new Date()
+        };
+      }
+    } else {
+      // For non-weather queries, use regular LLM
+      return await this.chatService.sendGeneralMessage(
+        message,
+        this.globalModelSelection.getSelectionForRequest()
+      );
+    }
+  }
+
   onGeneralEnterKey(event: KeyboardEvent) {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
@@ -379,6 +432,11 @@ export class DashboardComponent implements OnInit {
     else if (tab === 'vision') appName = 'vision';
     
     this.globalModelSelection.updateCurrentApp(appName);
+    
+    // If switching to chat tab and MCP was enabled, update to MCP models
+    if (tab === 'chat' && this.mcpEnabled) {
+      this.updateModelSelectionForMcp();
+    }
   }
 
   // Vision functionality methods
@@ -668,5 +726,46 @@ export class DashboardComponent implements OnInit {
     }
     
     return cleaned.substring(0, maxLength).trim() + '...';
+  }
+
+  async onMcpToggle() {
+    console.log('MCP enabled:', this.mcpEnabled);
+    
+    if (this.mcpEnabled) {
+      try {
+        await this.mcpService.initialize();
+        this.availableTools = await this.mcpService.getTools();
+        console.log('MCP initialized with tools:', this.availableTools);
+        this.updateModelSelectionForMcp();
+      } catch (error) {
+        console.error('Failed to initialize MCP:', error);
+        this.mcpEnabled = false;
+        alert('Failed to connect to MCP server. Please ensure the Firebase emulators are running.');
+      }
+    } else {
+      // Switch back to regular LLM models for chat
+      this.globalModelSelection.updateCurrentApp('chat');
+    }
+  }
+
+  private updateModelSelectionForMcp() {
+    // Create a custom selection for MCP models from chat->MCP section
+    const modelsConfigService = this.globalModelSelection.getModelsConfig();
+    const mcpProviders = modelsConfigService.getProviders('chat', 'MCP');
+    
+    if (mcpProviders.length > 0) {
+      const firstProvider = mcpProviders[0];
+      const models = modelsConfigService.getModels('chat', 'MCP', firstProvider);
+      if (models.length > 0) {
+        const mcpSelection = {
+          llm: {
+            provider: firstProvider,
+            model: models[0]
+          }
+        };
+        this.globalModelSelection.updateSelection(mcpSelection);
+        console.log('Updated to MCP models:', mcpSelection);
+      }
+    }
   }
 }

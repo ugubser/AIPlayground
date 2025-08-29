@@ -3,6 +3,7 @@ import { Firestore, collection, doc, addDoc, getDocs, query, where, orderBy, Tim
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { Auth } from '@angular/fire/auth';
 import { DynamicModelSelection } from './models-config.service';
+import { McpService, MCPToolCall } from './mcp.service';
 
 export interface ChatSession {
   id?: string;
@@ -56,7 +57,8 @@ export class ChatService {
   constructor(
     private firestore: Firestore,
     private functions: Functions,
-    private auth: Auth
+    private auth: Auth,
+    private mcpService: McpService
   ) { }
 
   async createSession(title?: string, associatedDocuments?: string[]): Promise<string> {

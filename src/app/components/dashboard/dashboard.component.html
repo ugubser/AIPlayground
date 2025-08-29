@@ -287,6 +287,20 @@
       <div class="general-chat-header">
         <h3>💬 General Chat</h3>
         <p>Ask any question - no documents required!</p>
+        
+        <div class="mcp-settings">
+          <label class="mcp-checkbox">
+            <input 
+              type="checkbox" 
+              [(ngModel)]="mcpEnabled"
+              (change)="onMcpToggle()">
+            <span class="checkmark"></span>
+            Enable MCP (Tool Calling)
+          </label>
+          <small class="mcp-info" *ngIf="mcpEnabled">
+            🔧 Tool calling enabled - you can ask about weather and more!
+          </small>
+        </div>
       </div>
 
       <div class="messages-container">

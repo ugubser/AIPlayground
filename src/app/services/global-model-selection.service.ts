@@ -63,4 +63,8 @@ export class GlobalModelSelectionService {
       embed: selection['embed']
     };
   }
+
+  getModelsConfig(): ModelsConfigService {
+    return this.modelsConfig;
+  }
 }

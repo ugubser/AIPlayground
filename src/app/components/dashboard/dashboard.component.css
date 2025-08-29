@@ -16,6 +16,36 @@
   scrollbar-width: none;
 }
 
+/* MCP Settings */
+.mcp-settings {
+  margin-top: var(--space-4);
+  padding: var(--space-3);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.mcp-checkbox {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+}
+
+.mcp-checkbox input[type="checkbox"] {
+  margin-right: var(--space-2);
+  width: 16px;
+  height: 16px;
+}
+
+.mcp-info {
+  display: block;
+  margin-top: var(--space-2);
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
 .tab-nav::-webkit-scrollbar {
   display: none;
 }
