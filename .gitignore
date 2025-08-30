@@ -20,7 +20,7 @@ dist/
 .angular/
 .claude/
 .firebase/
-functions/lib/shared/config/models.config.json
+
 emulator_data/
 
 #Functions - Auto-generated build artifacts
