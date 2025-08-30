@@ -23,12 +23,8 @@ dist/
 functions/lib/shared/config/models.config.json
 emulator_data/
 
-#Functions
-functions/lib/index.js
-functions/lib/index.js.map
-functions/lib/mcp-weather-server.js
-functions/lib/mcp-weather-server.js.map
-functions/lib/models.config.json
+#Functions - Auto-generated build artifacts
+functions/lib/
 functions/src/models.config.json
 
 
