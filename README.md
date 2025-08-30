@@ -1,24 +1,64 @@
-# Firebase RAG Chatbot
+# AI Playground - Multi-Modal Chat Application
 
-A Retrieval-Augmented Generation (RAG) chatbot built with Angular, Firebase, Together.ai for embeddings, and OpenRouter for chat completions. Upload PDF documents and ask questions about their content.
+A comprehensive AI-powered application built with Angular and Firebase, featuring Retrieval-Augmented Generation (RAG), Vision capabilities, and extensible Model Context Protocol (MCP) integrations. Upload documents, analyze images, and interact with various utility services through natural language.
 
 ## Features
 
-- 📄 PDF document upload and processing
-- 🤖 RAG-powered question answering
-- 💬 Multi-session chat interface
-- 🔒 Secure authentication (anonymous)
-- 🗄️ Document and chat history management
-- 🚀 Firebase emulator support for local development
+### Core AI Capabilities
+- 🤖 **Multi-modal chat interface** with support for text, images, and documents
+- 📄 **RAG-powered document Q&A** - Upload PDFs and ask questions about their content
+- 🖼️ **Vision analysis** - Upload images for AI-powered analysis and description
+- 🔧 **MCP integrations** - Extensible tool ecosystem for various utilities
+
+### Document & Data Management
+- 📚 **Document upload and processing** with chunking and embeddings
+- 💬 **Multi-session chat interface** with conversation history
+- 🗄️ **Persistent storage** for documents, chats, and user data
+- 🔒 **Secure authentication** (anonymous and user accounts)
+
+### MCP Tool Ecosystem
+- 🌤️ **Weather data** - Current weather and forecasts via OpenMeteo
+- 💰 **Financial data** - Stock prices and metrics via Yahoo Finance
+- 🕒 **Time utilities** - Timezone conversion and current time lookup
+- 🔄 **Unit conversion** - Convert between various units (temperature, length, mass, volume, data)
+- 🧮 **Mathematical calculations** - Expression evaluation, statistics, matrix operations
+- 💱 **Currency conversion** - Real-time exchange rates and historical data
+
+### Development & Deployment
+- 🚀 **Firebase emulator support** for local development
+- 🏗️ **Production deployment** to Firebase hosting and functions
 
 ## Tech Stack
 
-- **Frontend**: Angular 17 with standalone components
-- **Backend**: Firebase (Auth, Firestore, Storage, Functions, Hosting)
-- **PDF Processing**: PDF.js + LangChain.js text splitters
-- **Embeddings**: Together.ai (BAAI/bge-m3 model)
-- **LLM**: OpenRouter (Llama 3.1 70B Instruct)
-- **Development**: Firebase emulators
+### Frontend
+- **Angular 17** with standalone components
+- **Multi-modal interface** supporting text, images, and documents
+- **Real-time updates** with Firebase integration
+- **Dynamic AI model selection** with configurable providers
+
+### Backend
+- **Firebase** (Auth, Firestore, Storage, Functions, Hosting)
+- **Model Context Protocol (MCP)** servers for extensible tool integrations
+- **RESTful APIs** for AI service integrations
+
+### AI & Processing
+- **Document Processing**: PDF.js + LangChain.js text splitters
+- **Embeddings**: Together.ai (BAAI/bge-m3 model) for RAG
+- **LLM**: OpenRouter (Llama 3.1 70B Instruct) for chat and vision
+- **Vision**: Multi-modal LLMs for image analysis
+
+### MCP Services
+- **Weather**: OpenMeteo APIs
+- **Finance**: Yahoo Finance APIs  
+- **Time**: Built-in timezone handling
+- **Unit Conversion**: Mathematical conversion utilities
+- **Calculator**: mathjs for mathematical computations
+- **Currency**: Frankfurter API for exchange rates
+
+### Development
+- **Firebase emulators** for local development
+- **TypeScript** throughout the stack
+- **Environment-based configuration** for different deployment targets
 
 ## Prerequisites
 
@@ -78,11 +118,28 @@ A Retrieval-Augmented Generation (RAG) chatbot built with Angular, Firebase, Tog
 
 ## Usage
 
-1. **Sign in** (anonymous authentication)
-2. **Upload PDFs** on the Documents tab
-3. **Start chatting** - create a new chat session
-4. **Filter by document** to ask questions about specific files
-5. **View sources** - see which document chunks were used to answer questions
+### Getting Started
+1. **Sign in** (anonymous authentication or create account)
+2. **Choose your interaction mode**:
+   - **Chat Tab**: General conversation with AI models
+   - **Documents Tab**: Upload PDFs for document-based Q&A
+   - **Vision Tab**: Upload images for AI analysis
+
+### Document-Based Q&A (RAG)
+1. **Upload PDFs** on the Documents tab
+2. **Start chatting** - create a new chat session
+3. **Filter by document** to ask questions about specific files
+4. **View sources** - see which document chunks were used to answer questions
+
+### Vision Analysis
+1. **Upload images** in the Vision tab
+2. **Ask questions** about image content, request analysis, or get descriptions
+3. **Multi-modal conversations** combining text and visual understanding
+
+### MCP Tools Integration
+1. **Enable MCP servers** in chat settings (Weather, Finance, Time, etc.)
+2. **Natural language requests** - Ask about weather, stock prices, unit conversions
+3. **Automatic tool selection** - AI chooses appropriate tools based on your questions
 
 ## How RAG (Retrieval-Augmented Generation) Works
 
@@ -126,37 +183,44 @@ When you ask a question:
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                   Angular Frontend                  │
-│  ┌─────────────────┐  ┌────────────────────────────┐ │
-│  │  PDF Processing │  │         Chat UI            │ │
-│  │   (PDF.js +     │  │  (Sessions & Messages)    │ │
-│  │   LangChain)    │  │                            │ │
-│  └─────────────────┘  └────────────────────────────┘ │
-└─────────────────┬───────────────────────────────────┘
-                  │
-                  │ Firebase SDK
-                  │
-┌─────────────────▼───────────────────────────────────┐
-│                Firebase Services                    │
-│  ┌─────────┐ ┌──────────┐ ┌─────────┐ ┌────────────┐ │
-│  │   Auth  │ │ Firestore│ │ Storage │ │ Functions  │ │
-│  │         │ │ (chunks + │ │ (PDFs)  │ │(embedChunks│ │
-│  │         │ │embeddings)│ │         │ │ & chatRag) │ │
-│  └─────────┘ └──────────┘ └─────────┘ └────────────┘ │
-└─────────────────┬───────────────────────────────────┘
-                  │
-                  │ HTTP API calls
-                  │
-┌─────────────────▼───────────────────────────────────┐
-│              External APIs                          │
-│  ┌─────────────────┐      ┌─────────────────────────┐ │
-│  │   Together.ai   │      │      OpenRouter        │ │
-│  │ BAAI/bge-base-  │      │ meta-llama/llama-3.1-  │ │
-│  │ en-v1.5-vllm    │      │ 70b-instruct           │ │
-│  │ (Embeddings)    │      │ (Chat Completion)      │ │
-│  └─────────────────┘      └─────────────────────────┘ │
-└─────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                        Angular Frontend                         │
+│  ┌───────────────┐ ┌──────────────┐ ┌────────────────────────┐  │
+│  │ Multi-Modal   │ │ PDF/Document │ │      Chat Interface    │  │
+│  │ Chat UI       │ │ Processing   │ │   (Sessions & MCP)     │  │
+│  │ (Text/Vision) │ │ (PDF.js +    │ │                        │  │
+│  │               │ │  LangChain)  │ │                        │  │
+│  └───────────────┘ └──────────────┘ └────────────────────────┘  │
+└─────────────────────┬───────────────────────────────────────────┘
+                      │
+                      │ Firebase SDK + HTTP
+                      │
+┌─────────────────────▼───────────────────────────────────────────┐
+│                     Firebase Services                           │
+│  ┌─────────┐ ┌──────────┐ ┌─────────┐ ┌─────────────────────────┐ │
+│  │   Auth  │ │ Firestore│ │ Storage │ │      Functions          │ │
+│  │         │ │ (chunks +│ │(PDFs +  │ │ ┌─────────┐ ┌─────────┐ │ │
+│  │         │ │embeddings│ │ images) │ │ │Chat/RAG │ │6x MCP   │ │ │
+│  │         │ │+ chats)  │ │         │ │ │Functions│ │Servers  │ │ │
+│  └─────────┘ └──────────┘ └─────────┘ └─┴─────────┘ └─────────┘─┘ │
+└─────────────────────┬───────────────────────────────────────────┘
+                      │
+                      │ HTTP API calls
+                      │
+┌─────────────────────▼───────────────────────────────────────────┐
+│                    External APIs                                │
+│  ┌─────────────┐ ┌─────────────┐ ┌──────────────────────────────┐ │
+│  │ Together.ai │ │ OpenRouter  │ │        MCP Data Sources      │ │
+│  │ (BGE-M3     │ │ (LLaMA 3.1  │ │ ┌──────────┐ ┌─────────────┐ │ │
+│  │ Embeddings) │ │ 70B + Vision│ │ │OpenMeteo │ │Yahoo Finance│ │ │
+│  └─────────────┘ └─────────────┘ │ │(Weather) │ │  (Stocks)   │ │ │
+│                                  │ └──────────┘ └─────────────┘ │ │
+│                                  │ ┌──────────┐ ┌─────────────┐ │ │
+│                                  │ │Frankfurter│ │Mathematical │ │ │
+│                                  │ │(Currency) │ │ Libraries   │ │ │
+│                                  │ └──────────┘ └─────────────┘ │ │
+│                                  └──────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ## Data Models
@@ -209,19 +273,22 @@ TOGETHER_API_KEY=your_together_api_key
 OPENROUTER_API_KEY=your_openrouter_api_key
 ```
 
-## Troubleshooting
+Acknowldegments:
+The Weather MCP server uses OpenMeteo APIs and was implemented by me. 
 
-- **Emulator connection issues**: Check that all emulators are running and ports are available
-- **PDF processing errors**: Ensure PDF files are valid and under 50MB
-- **Embedding failures**: Verify Together.ai API key is set correctly
-- **Chat errors**: Check OpenRouter API key and model availability
-- **CORS issues**: Make sure to use emulators for local development
+The following MCP servers have been converted to Node and are acknowledged as follows: 
 
-## Next Steps
+Calculator MCP Server: 
+https://github.com/huhabla/calculator-mcp-server
 
-- Add user authentication (email/password, Google, etc.)
-- Implement document search and filtering
-- Add support for more file types (Word, PowerPoint, etc.)  
-- Implement conversation memory and context
-- Add file sharing between users
-- Performance optimizations for large document collections
+Yahoo Finance API MCP Server: 
+https://github.com/9nate-drake/mcp-yfinance
+
+Currency Conversion MCP Server: 
+https://github.com/wesbos/currency-conversion-mcp/tree/main?tab=readme-ov-file
+
+Unit Conversion MCP Server: 
+https://github.com/zazencodes/unit-converter-mcp
+
+Time Conversion MCP Server: 
+https://github.com/modelcontextprotocol/servers/blob/main/src/time/README.md
