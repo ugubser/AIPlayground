@@ -1606,3 +1606,6 @@ export const mcpWeatherServer = functions
       res.json(errorResponse);
     }
   });
+
+// Export the Yahoo Finance MCP server
+export { mcpYFinanceServer } from './mcp-yfinance-server';

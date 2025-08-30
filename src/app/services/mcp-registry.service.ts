@@ -64,6 +64,17 @@ export class McpRegistryService {
         type: 'http',
         enabled: true,
         status: 'unknown'
+      },
+      {
+        id: 'yfinance-local',
+        name: 'Yahoo Finance Server',
+        description: 'Stock market data and financial metrics via Yahoo Finance APIs',
+        url: environment.production 
+          ? 'https://us-central1-aiplayground-6e5be.cloudfunctions.net/mcpYFinanceServer'
+          : 'http://127.0.0.1:5001/aiplayground-6e5be/us-central1/mcpYFinanceServer',
+        type: 'http',
+        enabled: false,
+        status: 'unknown'
       }
     ];
 
