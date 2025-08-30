@@ -1609,3 +1609,6 @@ export const mcpWeatherServer = functions
 
 // Export the Yahoo Finance MCP server
 export { mcpYFinanceServer } from './mcp-yfinance-server';
+
+// Export the Time MCP server
+export { mcpTimeServer } from './mcp-time-server';

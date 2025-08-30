@@ -75,6 +75,17 @@ export class McpRegistryService {
         type: 'http',
         enabled: false,
         status: 'unknown'
+      },
+      {
+        id: 'time-local',
+        name: 'Time Server',
+        description: 'Current time and timezone conversion utilities',
+        url: environment.production 
+          ? 'https://us-central1-aiplayground-6e5be.cloudfunctions.net/mcpTimeServer'
+          : 'http://127.0.0.1:5001/aiplayground-6e5be/us-central1/mcpTimeServer',
+        type: 'http',
+        enabled: false,
+        status: 'unknown'
       }
     ];
 
