@@ -1612,3 +1612,6 @@ export { mcpYFinanceServer } from './mcp-yfinance-server';
 
 // Export the Time MCP server
 export { mcpTimeServer } from './mcp-time-server';
+
+// Export the Unit Converter MCP server
+export { mcpUnitConverterServer } from './mcp-unit-converter-server';

@@ -86,6 +86,17 @@ export class McpRegistryService {
         type: 'http',
         enabled: false,
         status: 'unknown'
+      },
+      {
+        id: 'unit-converter-local',
+        name: 'Unit Converter Server',
+        description: 'Convert between various units (temperature, length, mass, volume, data)',
+        url: environment.production 
+          ? 'https://us-central1-aiplayground-6e5be.cloudfunctions.net/mcpUnitConverterServer'
+          : 'http://127.0.0.1:5001/aiplayground-6e5be/us-central1/mcpUnitConverterServer',
+        type: 'http',
+        enabled: false,
+        status: 'unknown'
       }
     ];
 
