@@ -97,6 +97,17 @@ export class McpRegistryService {
         type: 'http',
         enabled: false,
         status: 'unknown'
+      },
+      {
+        id: 'calculator-local',
+        name: 'Calculator Server',
+        description: 'Mathematical calculations, equation solving, statistics, and matrix operations',
+        url: environment.production 
+          ? 'https://us-central1-aiplayground-6e5be.cloudfunctions.net/mcpCalculatorServer'
+          : 'http://127.0.0.1:5001/aiplayground-6e5be/us-central1/mcpCalculatorServer',
+        type: 'http',
+        enabled: false,
+        status: 'unknown'
       }
     ];
 

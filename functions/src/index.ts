@@ -1615,3 +1615,6 @@ export { mcpTimeServer } from './mcp-time-server';
 
 // Export the Unit Converter MCP server
 export { mcpUnitConverterServer } from './mcp-unit-converter-server';
+
+// Export the Calculator MCP server
+export { mcpCalculatorServer } from './mcp-calculator-server';
