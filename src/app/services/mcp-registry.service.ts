@@ -108,6 +108,17 @@ export class McpRegistryService {
         type: 'http',
         enabled: false,
         status: 'unknown'
+      },
+      {
+        id: 'currency-local',
+        name: 'Currency Converter Server',
+        description: 'Real-time currency conversion and exchange rates via Frankfurter API',
+        url: environment.production 
+          ? 'https://us-central1-aiplayground-6e5be.cloudfunctions.net/mcpCurrencyServer'
+          : 'http://127.0.0.1:5001/aiplayground-6e5be/us-central1/mcpCurrencyServer',
+        type: 'http',
+        enabled: false,
+        status: 'unknown'
       }
     ];
 

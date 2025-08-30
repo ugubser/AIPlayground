@@ -1618,3 +1618,6 @@ export { mcpUnitConverterServer } from './mcp-unit-converter-server';
 
 // Export the Calculator MCP server
 export { mcpCalculatorServer } from './mcp-calculator-server';
+
+// Export the Currency MCP server
+export { mcpCurrencyServer } from './mcp-currency-server';
