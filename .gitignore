@@ -21,6 +21,7 @@ dist/
 .claude/
 .firebase/
 
+# Firebase emulator data
 emulator_data/
 
 #Functions - Auto-generated build artifacts
@@ -83,3 +84,6 @@ src/environments/environment.prod.ts
 
 # dataconnect generated files
 .dataconnect
+
+#MacOS
+.DS_Store
