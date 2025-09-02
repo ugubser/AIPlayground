@@ -104,13 +104,7 @@ A comprehensive AI-powered application built with Angular and Firebase, featurin
      - Hosting emulator on port 5050
      - Emulator UI on port 4000
 
-2. **In another terminal, start Angular dev server:**
-   ```bash
-   npm start
-   ```
-   Access the app at http://localhost:4200
-
-3. **Monitor emulators:**
+2. **Monitor emulators:**
    - Emulator UI: http://localhost:4000
    - Firestore: http://localhost:4000/firestore
    - Auth: http://localhost:4000/auth

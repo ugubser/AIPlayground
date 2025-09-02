@@ -17,7 +17,7 @@ import { filter } from 'rxjs/operators';
   styleUrl: './app.component.css'
 })
 export class AppComponent implements OnInit {
-  title = 'Vanguard Signals AI Playground';
+  title = 'AI Playground';
   user$: Observable<User | null>;
   loading = false;
   currentAppName = 'rag';

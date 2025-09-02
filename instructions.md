@@ -1,4 +1,4 @@
-# Vanguard Signals AI Playground - User Instructions
+# AI Playground - User Instructions
 
 ## Overview
 
