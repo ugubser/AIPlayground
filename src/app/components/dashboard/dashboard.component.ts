@@ -385,20 +385,17 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.scrollToBottomAfterDelay(this.generalMessagesContainer);
 
     try {
-      let response: ChatMessage;
-      
       if (this.mcpEnabled) {
-        // Use MCP-enabled chat with tool calling capability
-        response = await this.sendMcpMessage(messageText);
+        // Use MCP-enabled chat with tool calling capability - handle responses separately
+        await this.sendMcpMessageWithSeparateResponses(messageText);
       } else {
         // Use regular general chat
-        response = await this.chatService.sendGeneralMessage(
+        const response = await this.chatService.sendGeneralMessage(
           messageText,
           this.globalModelSelection.getSelectionForRequest()
         );
+        this.generalMessages.push(response);
       }
-      
-      this.generalMessages.push(response);
       
       // Scroll to show the assistant response
       this.scrollToBottomAfterDelay(this.generalMessagesContainer);
@@ -509,6 +506,121 @@ export class DashboardComponent implements OnInit, OnDestroy {
     }
   }
 
+  private async sendMcpMessageWithSeparateResponses(message: string): Promise<void> {
+    try {
+      // Generate a consistent message ID for the entire MCP conversation
+      const conversationMessageId = `mcp_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+      
+      // Get current selection and extract MCP provider/model if available
+      const currentSelection = this.globalModelSelection.getSelectionForRequest();
+      let mcpModelSelection = currentSelection;
+      
+      // If we have an MCP selection in the current selection, use it for LLM
+      if (currentSelection && currentSelection['mcp']) {
+        mcpModelSelection = {
+          llm: {
+            provider: currentSelection['mcp'].provider,
+            model: currentSelection['mcp'].model
+          }
+        };
+        this.logger.debug('Using MCP provider for tool calling', mcpModelSelection);
+      }
+      
+      // Step 1: Send message to LLM with available tools
+      const firstMessageId = conversationMessageId + '_reasoning';
+      const mcpResponse = await this.chatService.sendMcpMessage(
+        message,
+        mcpModelSelection,
+        undefined,
+        firstMessageId
+      );
+      
+      // Step 2: Show first response immediately if there are tool calls
+      if (mcpResponse.toolCalls && mcpResponse.toolCalls.length > 0) {
+        this.logger.debug('LLM requested tool calls', mcpResponse.toolCalls);
+        
+        // Show the first response (reasoning) immediately
+        if (mcpResponse.answer && mcpResponse.answer.trim() && mcpResponse.answer !== 'I need to use some tools to answer your question.') {
+          this.generalMessages.push({
+            id: firstMessageId,
+            role: 'assistant',
+            content: `🤔 **Thinking:** ${mcpResponse.answer}`,
+            createdAt: new Date()
+          });
+          
+          // Scroll to show the first response
+          this.scrollToBottomAfterDelay(this.generalMessagesContainer);
+        }
+        
+        const toolResults: any[] = [];
+        
+        for (const toolCall of mcpResponse.toolCalls) {
+          try {
+            this.logger.debug('Executing tool call', toolCall);
+            const result = await this.mcpService.callTool(toolCall);
+            const toolOutput = result.content.map(c => c.text).join(' ');
+            
+            toolResults.push({
+              toolName: toolCall.name,
+              arguments: toolCall.arguments,
+              result: toolOutput
+            });
+          } catch (toolError) {
+            this.logger.error('Tool call error', toolError);
+            toolResults.push({
+              toolName: toolCall.name,
+              arguments: toolCall.arguments,
+              result: `Error: ${toolError}`
+            });
+          }
+        }
+        
+        // Step 3: Send tool results back to LLM for final contextual response
+        const finalMessageId = conversationMessageId + '_final';
+        const finalResponse = await this.chatService.sendMcpMessage(
+          message,
+          mcpModelSelection,
+          toolResults,
+          finalMessageId
+        );
+        
+        // Show the final response
+        this.generalMessages.push({
+          id: finalMessageId,
+          role: 'assistant',
+          content: `✅ **Answer:** ${finalResponse.answer}`,
+          createdAt: new Date()
+        });
+        
+        // Scroll to show the final response
+        this.scrollToBottomAfterDelay(this.generalMessagesContainer);
+        
+      } else {
+        // No tool calls, show response directly
+        this.generalMessages.push({
+          id: conversationMessageId,
+          role: 'assistant',
+          content: mcpResponse.answer,
+          createdAt: new Date()
+        });
+        
+        // Scroll to show the response
+        this.scrollToBottomAfterDelay(this.generalMessagesContainer);
+      }
+      
+    } catch (error) {
+      const errorContent = this.errorHandler.createChatErrorMessage(error, 'MCP');
+      
+      this.generalMessages.push({
+        role: 'assistant',
+        content: errorContent,
+        createdAt: new Date()
+      });
+      
+      // Scroll to show the error message
+      this.scrollToBottomAfterDelay(this.generalMessagesContainer);
+    }
+  }
 
   onGeneralEnterKey(event: KeyboardEvent) {
     if (event.key === 'Enter' && !event.shiftKey) {
@@ -894,6 +1006,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   getPromptLogsForMessage(messageId: string): PromptLogEntry[] {
+    // Now that we use specific message IDs for each interaction, return exact matches
     return this.promptLogs.filter(log => log.messageId === messageId);
   }
 
