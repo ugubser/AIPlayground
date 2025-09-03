@@ -815,6 +815,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
   async onMcpToggle() {
     this.logger.info('MCP toggled', { enabled: this.mcpEnabled });
     
+    // Update global model selection service with MCP state
+    this.globalModelSelection.updateMcpEnabled(this.mcpEnabled);
+    
     if (this.mcpEnabled) {
       try {
         // Initialize enabled servers
@@ -835,6 +838,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
       } catch (error) {
         this.logger.error('Failed to initialize MCP', error);
         this.mcpEnabled = false;
+        // Update global service with the reverted state
+        this.globalModelSelection.updateMcpEnabled(false);
         alert('Failed to connect to MCP servers. Please check server availability.');
       }
     }

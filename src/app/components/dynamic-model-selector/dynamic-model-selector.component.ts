@@ -1,7 +1,9 @@
-import { Component, Input, Output, EventEmitter, OnInit, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnChanges, SimpleChanges, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ModelsConfigService, DynamicModelSelection } from '../../services/models-config.service';
+import { GlobalModelSelectionService } from '../../services/global-model-selection.service';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-dynamic-model-selector',
@@ -192,18 +194,24 @@ import { ModelsConfigService, DynamicModelSelection } from '../../services/model
     }
   `]
 })
-export class DynamicModelSelectorComponent implements OnInit, OnChanges {
+export class DynamicModelSelectorComponent implements OnInit, OnChanges, OnDestroy {
   @Input() appName: string = 'rag';
   @Input() showCurrentSelection: boolean = true;
   @Output() selectionChange = new EventEmitter<DynamicModelSelection>();
 
   selection: DynamicModelSelection = {};
   modelTypes: string[] = [];
+  
+  private mcpSubscription?: Subscription;
 
-  constructor(private modelsConfig: ModelsConfigService) {}
+  constructor(
+    private modelsConfig: ModelsConfigService, 
+    private globalModelSelection: GlobalModelSelectionService
+  ) {}
 
   ngOnInit() {
     this.initializeComponent();
+    this.subscribeToMcpChanges();
   }
 
   ngOnChanges(changes: SimpleChanges) {
@@ -211,10 +219,26 @@ export class DynamicModelSelectorComponent implements OnInit, OnChanges {
       this.initializeComponent();
     }
   }
+  
+  ngOnDestroy() {
+    if (this.mcpSubscription) {
+      this.mcpSubscription.unsubscribe();
+    }
+  }
 
   private initializeComponent() {
-    this.modelTypes = this.modelsConfig.getModelTypes(this.appName);
+    this.modelTypes = this.globalModelSelection.getFilteredModelTypes(this.appName);
     this.resetToDefaults();
+  }
+  
+  private subscribeToMcpChanges() {
+    // Subscribe to MCP state changes to update model types for chat app
+    this.mcpSubscription = this.globalModelSelection.mcpEnabled$.subscribe(() => {
+      if (this.appName === 'chat') {
+        this.modelTypes = this.globalModelSelection.getFilteredModelTypes(this.appName);
+        this.resetToDefaults();
+      }
+    });
   }
 
   getDisplayName(modelType: string): string {
