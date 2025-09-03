@@ -174,6 +174,97 @@ When you ask a question:
 
 **Example**: If you ask "How does machine learning work?", the embedding captures the semantic meaning, finds chunks about ML concepts from your uploaded documents, and the LLM synthesizes an answer using only those specific sections.
 
+## How MCP (Model Context Protocol) Works
+
+The system implements MCP to extend AI capabilities through external tools and services. Here's the complete orchestration flow:
+
+### **Phase 1: Server Discovery & Tool Registration** (Initialization)
+
+When you enable MCP in the chat tab:
+
+1. **Server Configuration**: The system loads pre-configured MCP servers (Weather, Finance, Time, etc.) from the registry
+2. **Server Initialization**: Each enabled server receives a POST request to `/initialize` for MCP protocol handshake
+3. **Tool Discovery**: The system queries each server's `/tools/list` endpoint to get available tools with their schemas:
+   ```json
+   {
+     "tools": [{
+       "name": "get_weather",
+       "description": "Get current weather for a city",
+       "inputSchema": {
+         "type": "object",
+         "properties": {
+           "city": { "type": "string", "description": "City name" }
+         }
+       }
+     }]
+   }
+   ```
+4. **Tool Aggregation**: All available tools from all enabled servers are combined into a single registry
+
+### **Phase 2: Conversational Tool Calling** (Chat Interaction)
+
+When you ask a question with MCP enabled:
+
+1. **Initial LLM Request** (Phase 1):
+   - Your message + all available tool schemas are sent to the LLM
+   - LLM analyzes the query and decides if tools are needed
+   - If tools are required, LLM responds with structured tool calls:
+     ```json
+     {
+       "tool_calls": [{
+         "name": "get_weather",
+         "arguments": { "city": "Paris" }
+       }]
+     }
+     ```
+
+2. **Tool Execution** (Middleware):
+   - System routes each tool call to the appropriate MCP server
+   - Server executes the tool and returns structured data:
+     ```json
+     {
+       "content": [{
+         "type": "text",
+         "text": "Current weather in Paris: 22°C, partly cloudy, 65% humidity"
+       }]
+     }
+     ```
+
+3. **Final LLM Request** (Phase 2):
+   - Original message + tool results are sent back to the LLM
+   - LLM synthesizes a natural language response incorporating tool data
+   - User receives a conversational answer: *"The current weather in Paris is 22°C and partly cloudy with 65% humidity."*
+
+### **MCP Server Architecture**
+
+Each MCP server is implemented as a Firebase Cloud Function with HTTP endpoints:
+
+- **`/initialize`**: MCP protocol handshake and server capabilities
+- **`/tools/list`**: Returns available tools with JSON schemas
+- **`/tools/call`**: Executes specific tools with provided arguments
+
+**Available MCP Servers**:
+- 🌤️ **Weather**: OpenMeteo APIs for current conditions and forecasts
+- 💰 **Finance**: Yahoo Finance for stock data and financial metrics
+- 🕒 **Time**: Timezone conversions and current time lookups
+- 🔄 **Unit Converter**: Temperature, length, mass, volume, data conversions
+- 🧮 **Calculator**: Mathematical expressions, statistics, matrix operations
+- 💱 **Currency**: Real-time exchange rates via Frankfurter API
+
+### **Why This Works**
+
+- **Seamless Integration**: Users interact naturally without knowing which tools are being used
+- **Extensible Architecture**: New tools can be added by implementing MCP server endpoints
+- **Intelligent Routing**: LLM automatically selects appropriate tools based on context
+- **Structured Data**: Tools return structured data that LLMs can easily incorporate
+- **Error Handling**: Tool failures are gracefully handled and reported to users
+
+**Example Flow**: 
+- **User**: *"What's the weather in Tokyo and how much is 100 USD in JPY?"*
+- **System**: Detects need for weather + currency tools
+- **Phase 1**: LLM calls `get_weather(city: "Tokyo")` and `convert_currency(from: "USD", to: "JPY", amount: 100)`
+- **Phase 2**: LLM receives weather data and exchange rate, responds: *"Tokyo is currently 18°C and cloudy. 100 USD equals approximately 14,500 JPY at today's exchange rate."*
+
 ## Architecture
 
 ```

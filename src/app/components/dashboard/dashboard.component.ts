@@ -421,6 +421,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   private async sendMcpMessage(message: string): Promise<ChatMessage> {
     try {
+      // Generate a consistent message ID for the entire MCP conversation
+      const conversationMessageId = `mcp_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+      
       // Get current selection and extract MCP provider/model if available
       const currentSelection = this.globalModelSelection.getSelectionForRequest();
       let mcpModelSelection = currentSelection;
@@ -439,7 +442,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
       // Step 1: Send message to LLM with available tools
       const mcpResponse = await this.chatService.sendMcpMessage(
         message,
-        mcpModelSelection
+        mcpModelSelection,
+        undefined,
+        conversationMessageId
       );
       
       // Step 2: If LLM requested tool calls, execute them and get final response
@@ -473,11 +478,12 @@ export class DashboardComponent implements OnInit, OnDestroy {
         const finalResponse = await this.chatService.sendMcpMessage(
           message,
           mcpModelSelection,
-          toolResults
+          toolResults,
+          conversationMessageId
         );
         
         return {
-          id: finalResponse.messageId,
+          id: conversationMessageId,
           role: 'assistant',
           content: finalResponse.answer,
           createdAt: new Date()
@@ -486,7 +492,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       
       // No tool calls, return LLM response directly
       return {
-        id: mcpResponse.messageId,
+        id: conversationMessageId,
         role: 'assistant',
         content: mcpResponse.answer,
         createdAt: new Date()

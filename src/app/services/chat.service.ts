@@ -482,7 +482,7 @@ export class ChatService {
     await updateDoc(sessionRef, { title });
   }
 
-  async sendMcpMessage(message: string, modelSelection?: DynamicModelSelection, toolResults?: any[]): Promise<{ answer: string; toolCalls?: { name: string; arguments: Record<string, any> }[]; messageId?: string }> {
+  async sendMcpMessage(message: string, modelSelection?: DynamicModelSelection, toolResults?: any[], conversationMessageId?: string): Promise<{ answer: string; toolCalls?: { name: string; arguments: Record<string, any> }[]; messageId?: string }> {
     if (!this.auth.currentUser) {
       throw new Error('User not authenticated');
     }
@@ -517,10 +517,10 @@ export class ChatService {
 
       const { data } = await this.mcpChat(mcpRequest);
 
-      // Generate a temporary message ID for MCP chat
-      const messageId = `mcp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      // Use provided conversation message ID or generate a temporary one for MCP chat
+      const messageId = conversationMessageId || `mcp_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
-      // Log prompt data if enabled, using the temporary message ID
+      // Log prompt data if enabled, using the consistent message ID
       if (this.promptLogging.isLoggingActive() && data.promptData) {
         if (data.promptData.llmRequest) {
           this.promptLogging.addPromptLog({
