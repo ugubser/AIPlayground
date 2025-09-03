@@ -676,7 +676,7 @@
 .message-text {
   line-height: 1.4;
   white-space: pre-wrap;
-  font-size: 0.66rem;
+  font-size: 1rem;
   word-wrap: break-word;
 }
 
@@ -780,7 +780,7 @@
   min-height: 32px;
   max-height: 84px;
   font-family: var(--font-family-primary);
-  font-size: 0.66rem;
+  font-size: 1rem;
   background: var(--color-surface);
   color: var(--color-text-primary);
   transition: all var(--transition-fast);
@@ -1527,7 +1527,7 @@
   min-height: 56px;
   max-height: 84px;
   font-family: var(--font-family-primary);
-  font-size: 0.66rem;
+  font-size: 1rem;
   background: var(--color-surface);
   color: var(--color-text-primary);
   transition: all var(--transition-fast);
@@ -1622,7 +1622,7 @@
 .message-text {
   line-height: 1.4;
   white-space: pre-wrap;
-  font-size: 0.66rem;
+  font-size: 1rem;
   word-wrap: break-word;
 }
 
