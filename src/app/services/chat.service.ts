@@ -173,51 +173,7 @@ export class ChatService {
 
       const { data } = await this.chatRag(ragRequest);
 
-      // Log prompt data if enabled
-      if (this.promptLogging.isLoggingActive() && data.promptData) {
-        if (data.promptData.embedRequest) {
-          this.promptLogging.addPromptLog({
-            type: 'request',
-            provider: data.promptData.embedRequest.provider,
-            model: data.promptData.embedRequest.model,
-            content: data.promptData.embedRequest.content,
-            timestamp: new Date(),
-            sessionContext: 'rag'
-          });
-        }
-        if (data.promptData.embedResponse) {
-          this.promptLogging.addPromptLog({
-            type: 'response',
-            provider: data.promptData.embedResponse.provider,
-            model: data.promptData.embedResponse.model,
-            content: data.promptData.embedResponse.content,
-            timestamp: new Date(),
-            sessionContext: 'rag'
-          });
-        }
-        if (data.promptData.llmRequest) {
-          this.promptLogging.addPromptLog({
-            type: 'request',
-            provider: data.promptData.llmRequest.provider,
-            model: data.promptData.llmRequest.model,
-            content: data.promptData.llmRequest.content,
-            timestamp: new Date(),
-            sessionContext: 'rag'
-          });
-        }
-        if (data.promptData.llmResponse) {
-          this.promptLogging.addPromptLog({
-            type: 'response',
-            provider: data.promptData.llmResponse.provider,
-            model: data.promptData.llmResponse.model,
-            content: data.promptData.llmResponse.content,
-            timestamp: new Date(),
-            sessionContext: 'rag'
-          });
-        }
-      }
-
-      // Save assistant message
+      // Save assistant message first to get the ID
       const assistantMessage: Omit<ChatMessage, 'id'> = {
         role: 'assistant',
         content: data.answer,
@@ -229,6 +185,54 @@ export class ChatService {
         collection(this.firestore, `sessions/${sessionId}/messages`),
         assistantMessage
       );
+
+      // Log prompt data if enabled, using the message ID
+      if (this.promptLogging.isLoggingActive() && data.promptData) {
+        if (data.promptData.embedRequest) {
+          this.promptLogging.addPromptLog({
+            type: 'request',
+            provider: data.promptData.embedRequest.provider,
+            model: data.promptData.embedRequest.model,
+            content: data.promptData.embedRequest.content,
+            timestamp: new Date(),
+            sessionContext: 'rag',
+            messageId: assistantMessageRef.id
+          });
+        }
+        if (data.promptData.embedResponse) {
+          this.promptLogging.addPromptLog({
+            type: 'response',
+            provider: data.promptData.embedResponse.provider,
+            model: data.promptData.embedResponse.model,
+            content: data.promptData.embedResponse.content,
+            timestamp: new Date(),
+            sessionContext: 'rag',
+            messageId: assistantMessageRef.id
+          });
+        }
+        if (data.promptData.llmRequest) {
+          this.promptLogging.addPromptLog({
+            type: 'request',
+            provider: data.promptData.llmRequest.provider,
+            model: data.promptData.llmRequest.model,
+            content: data.promptData.llmRequest.content,
+            timestamp: new Date(),
+            sessionContext: 'rag',
+            messageId: assistantMessageRef.id
+          });
+        }
+        if (data.promptData.llmResponse) {
+          this.promptLogging.addPromptLog({
+            type: 'response',
+            provider: data.promptData.llmResponse.provider,
+            model: data.promptData.llmResponse.model,
+            content: data.promptData.llmResponse.content,
+            timestamp: new Date(),
+            sessionContext: 'rag',
+            messageId: assistantMessageRef.id
+          });
+        }
+      }
 
       return {
         id: assistantMessageRef.id,
@@ -288,7 +292,10 @@ export class ChatService {
 
       const { data } = await this.generalChat(generalRequest);
 
-      // Log prompt data if enabled
+      // Generate a temporary message ID for general chat
+      const messageId = `general_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      // Log prompt data if enabled, using the temporary message ID
       if (this.promptLogging.isLoggingActive() && data.promptData) {
         if (data.promptData.llmRequest) {
           this.promptLogging.addPromptLog({
@@ -297,7 +304,8 @@ export class ChatService {
             model: data.promptData.llmRequest.model,
             content: data.promptData.llmRequest.content,
             timestamp: new Date(),
-            sessionContext: 'general'
+            sessionContext: 'general',
+            messageId: messageId
           });
         }
         if (data.promptData.llmResponse) {
@@ -307,12 +315,14 @@ export class ChatService {
             model: data.promptData.llmResponse.model,
             content: data.promptData.llmResponse.content,
             timestamp: new Date(),
-            sessionContext: 'general'
+            sessionContext: 'general',
+            messageId: messageId
           });
         }
       }
 
       return {
+        id: messageId,
         role: 'assistant',
         content: data.answer,
         createdAt: new Date()
@@ -364,7 +374,10 @@ export class ChatService {
 
       const { data } = await this.visionChat(visionRequest);
 
-      // Log prompt data if enabled
+      // Generate a temporary message ID for vision chat
+      const messageId = `vision_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      // Log prompt data if enabled, using the temporary message ID
       if (this.promptLogging.isLoggingActive() && data.promptData) {
         if (data.promptData.visionRequest) {
           this.promptLogging.addPromptLog({
@@ -373,7 +386,8 @@ export class ChatService {
             model: data.promptData.visionRequest.model,
             content: data.promptData.visionRequest.content,
             timestamp: new Date(),
-            sessionContext: 'vision'
+            sessionContext: 'vision',
+            messageId: messageId
           });
         }
         if (data.promptData.visionResponse) {
@@ -383,12 +397,14 @@ export class ChatService {
             model: data.promptData.visionResponse.model,
             content: data.promptData.visionResponse.content,
             timestamp: new Date(),
-            sessionContext: 'vision'
+            sessionContext: 'vision',
+            messageId: messageId
           });
         }
       }
 
       return {
+        id: messageId,
         role: 'assistant',
         content: data.answer,
         createdAt: new Date()
@@ -466,7 +482,7 @@ export class ChatService {
     await updateDoc(sessionRef, { title });
   }
 
-  async sendMcpMessage(message: string, modelSelection?: DynamicModelSelection, toolResults?: any[]): Promise<{ answer: string; toolCalls?: { name: string; arguments: Record<string, any> }[] }> {
+  async sendMcpMessage(message: string, modelSelection?: DynamicModelSelection, toolResults?: any[]): Promise<{ answer: string; toolCalls?: { name: string; arguments: Record<string, any> }[]; messageId?: string }> {
     if (!this.auth.currentUser) {
       throw new Error('User not authenticated');
     }
@@ -501,7 +517,10 @@ export class ChatService {
 
       const { data } = await this.mcpChat(mcpRequest);
 
-      // Log prompt data if enabled
+      // Generate a temporary message ID for MCP chat
+      const messageId = `mcp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      // Log prompt data if enabled, using the temporary message ID
       if (this.promptLogging.isLoggingActive() && data.promptData) {
         if (data.promptData.llmRequest) {
           this.promptLogging.addPromptLog({
@@ -510,7 +529,8 @@ export class ChatService {
             model: data.promptData.llmRequest.model,
             content: data.promptData.llmRequest.content,
             timestamp: new Date(),
-            sessionContext: 'mcp'
+            sessionContext: 'mcp',
+            messageId: messageId
           });
         }
         if (data.promptData.llmResponse) {
@@ -520,14 +540,16 @@ export class ChatService {
             model: data.promptData.llmResponse.model,
             content: data.promptData.llmResponse.content,
             timestamp: new Date(),
-            sessionContext: 'mcp'
+            sessionContext: 'mcp',
+            messageId: messageId
           });
         }
       }
 
       return {
         answer: data.answer,
-        toolCalls: data.toolCalls as { name: string; arguments: Record<string, any> }[]
+        toolCalls: data.toolCalls as { name: string; arguments: Record<string, any> }[],
+        messageId: messageId
       };
 
     } catch (error) {

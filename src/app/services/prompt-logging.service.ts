@@ -10,6 +10,7 @@ export interface PromptLogEntry {
   content: string;
   expanded: boolean;
   sessionContext?: 'rag' | 'general' | 'vision' | 'mcp';
+  messageId?: string;
 }
 
 @Injectable({
@@ -50,6 +51,17 @@ export class PromptLoggingService {
     this.promptLogsSubject.next([...currentLogs, newEntry]);
   }
 
+  clearLogsForContext(context?: string): void {
+    if (!context) {
+      this.clearLogs();
+      return;
+    }
+    
+    const currentLogs = this.promptLogsSubject.value;
+    const filteredLogs = currentLogs.filter(log => log.sessionContext !== context);
+    this.promptLogsSubject.next(filteredLogs);
+  }
+
   toggleExpanded(entryId: string): void {
     const currentLogs = this.promptLogsSubject.value;
     const updatedLogs = currentLogs.map(log => 
@@ -66,6 +78,10 @@ export class PromptLoggingService {
     return this.promptLogsSubject.value.filter(log => 
       !sessionContext || log.sessionContext === sessionContext
     );
+  }
+
+  getLogsForMessage(messageId: string): PromptLogEntry[] {
+    return this.promptLogsSubject.value.filter(log => log.messageId === messageId);
   }
 
   private generateId(): string {

@@ -239,9 +239,9 @@
               </div>
 
               <!-- Show prompt logs after assistant messages -->
-              <ng-container *ngIf="message.role === 'assistant'">
+              <ng-container *ngIf="message.role === 'assistant' && message.id">
                 <app-prompt-message 
-                  *ngFor="let promptLog of getPromptLogsForContext('rag'); trackBy: trackByPromptId"
+                  *ngFor="let promptLog of getPromptLogsForMessage(message.id); trackBy: trackByPromptId"
                   [entry]="promptLog">
                 </app-prompt-message>
               </ng-container>
@@ -352,9 +352,9 @@
             </div>
 
             <!-- Show prompt logs after assistant messages -->
-            <ng-container *ngIf="message.role === 'assistant'">
+            <ng-container *ngIf="message.role === 'assistant' && message.id">
               <app-prompt-message 
-                *ngFor="let promptLog of getPromptLogsForContext(mcpEnabled ? 'mcp' : 'general'); trackBy: trackByPromptId"
+                *ngFor="let promptLog of getPromptLogsForMessage(message.id); trackBy: trackByPromptId"
                 [entry]="promptLog">
               </app-prompt-message>
             </ng-container>
@@ -491,9 +491,9 @@
               </div>
 
               <!-- Show prompt logs after assistant messages -->
-              <ng-container *ngIf="message.role === 'assistant'">
+              <ng-container *ngIf="message.role === 'assistant' && message.id">
                 <app-prompt-message 
-                  *ngFor="let promptLog of getPromptLogsForContext('vision'); trackBy: trackByPromptId"
+                  *ngFor="let promptLog of getPromptLogsForMessage(message.id); trackBy: trackByPromptId"
                   [entry]="promptLog">
                 </app-prompt-message>
               </ng-container>

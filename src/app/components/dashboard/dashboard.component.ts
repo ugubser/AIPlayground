@@ -18,6 +18,7 @@ import { SharedUtilsService } from '../../utils/shared-utils.service';
 import { PromptLoggingService, PromptLogEntry } from '../../services/prompt-logging.service';
 
 interface VisionMessage {
+  id?: string;
   role: 'user' | 'assistant';
   content?: string;
   image?: { url: string; name: string };
@@ -476,6 +477,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         );
         
         return {
+          id: finalResponse.messageId,
           role: 'assistant',
           content: finalResponse.answer,
           createdAt: new Date()
@@ -484,6 +486,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       
       // No tool calls, return LLM response directly
       return {
+        id: mcpResponse.messageId,
         role: 'assistant',
         content: mcpResponse.answer,
         createdAt: new Date()
@@ -613,6 +616,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       
       // Add assistant response
       const assistantMessage: VisionMessage = {
+        id: response.id,
         role: 'assistant',
         content: response.content,
         createdAt: new Date()
@@ -876,6 +880,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   getPromptLogsForContext(context: 'rag' | 'general' | 'vision' | 'mcp'): PromptLogEntry[] {
     return this.promptLogs.filter(log => log.sessionContext === context);
+  }
+
+  getPromptLogsForMessage(messageId: string): PromptLogEntry[] {
+    return this.promptLogs.filter(log => log.messageId === messageId);
   }
 
   trackByPromptId(index: number, item: PromptLogEntry): string {
