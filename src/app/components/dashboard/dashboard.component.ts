@@ -1,6 +1,7 @@
 import { Component, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewChecked } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { MarkdownModule } from 'ngx-markdown';
 import { PromptMessageComponent } from '../prompt-message/prompt-message.component';
 
 import { PdfProcessorService, ChunkData } from '../../services/pdf-processor.service';
@@ -29,7 +30,7 @@ interface VisionMessage {
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, PromptMessageComponent],
+  imports: [CommonModule, FormsModule, MarkdownModule, PromptMessageComponent],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.css'
 })

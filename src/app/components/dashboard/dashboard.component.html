@@ -220,7 +220,9 @@
                 [class.assistant-message]="message.role === 'assistant'">
                 
                 <div class="message-content">
-                  <div class="message-text">{{ message.content }}</div>
+                  <div class="message-text">
+                    <markdown [data]="message.content"></markdown>
+                  </div>
                   <div class="message-sources" *ngIf="message.sources && message.sources.length > 0">
                     <h5>Sources:</h5>
                     <div class="source-tags">
@@ -343,7 +345,9 @@
               [class.assistant-message]="message.role === 'assistant'">
               
               <div class="message-content">
-                <div class="message-text">{{ message.content }}</div>
+                <div class="message-text">
+                  <markdown [data]="message.content"></markdown>
+                </div>
               </div>
               
               <div class="message-time">
@@ -479,7 +483,9 @@
                   <div class="message-image" *ngIf="message.image">
                     <img [src]="message.image.url" [alt]="message.image.name" class="message-image-preview">
                   </div>
-                  <div class="message-text" *ngIf="message.content">{{ message.content }}</div>
+                  <div class="message-text" *ngIf="message.content">
+                    <markdown [data]="message.content"></markdown>
+                  </div>
                   <div class="message-prompt" *ngIf="message.prompt">
                     <strong>Prompt:</strong> {{ message.prompt }}
                   </div>
