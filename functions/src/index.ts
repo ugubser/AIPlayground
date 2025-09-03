@@ -679,6 +679,18 @@ export const chatRag = functions
             model: actualEmbedModel, 
             content: `Status: ${embResponse.status}\nVector length: ${queryVector.length}`
           },
+          searchData: {
+            totalChunks: allChunks.length,
+            compatibleChunks: compatibleChunks.length,
+            topChunks: scoredChunks.map(item => ({
+              docId: item.chunk.docId,
+              page: item.chunk.page,
+              score: Math.round(item.score * 1000) / 1000,
+              preview: item.chunk.text.substring(0, 100) + (item.chunk.text.length > 100 ? '...' : '')
+            })),
+            contextLength: context.length,
+            documentsUsed: [...new Set(scoredChunks.map(item => item.chunk.docId))].length
+          },
           llmRequest: {
             provider: actualLlmProvider,
             model: actualLlmModel,

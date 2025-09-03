@@ -210,6 +210,17 @@ export class ChatService {
             messageId: assistantMessageRef.id
           });
         }
+        if (data.promptData.searchData) {
+          this.promptLogging.addPromptLog({
+            type: 'response',
+            provider: 'RAG Search',
+            model: 'Document Search',
+            content: this.formatSearchData(data.promptData.searchData),
+            timestamp: new Date(),
+            sessionContext: 'rag',
+            messageId: assistantMessageRef.id
+          });
+        }
         if (data.promptData.llmRequest) {
           this.promptLogging.addPromptLog({
             type: 'request',
@@ -556,5 +567,31 @@ export class ChatService {
       console.error('Error getting MCP chat response:', error);
       throw error;
     }
+  }
+
+  private formatSearchData(searchData: any): string {
+    const {
+      totalChunks,
+      compatibleChunks,
+      topChunks,
+      contextLength,
+      documentsUsed
+    } = searchData;
+
+    let result = `🔍 **Document Search Results**\n\n`;
+    result += `📊 **Search Summary:**\n`;
+    result += `• Total chunks found: ${totalChunks}\n`;
+    result += `• Compatible chunks: ${compatibleChunks}\n`;
+    result += `• Documents used: ${documentsUsed}\n`;
+    result += `• Context length: ${contextLength.toLocaleString()} characters\n\n`;
+
+    result += `🎯 **Top Matches Used:**\n`;
+    topChunks.forEach((chunk: any, index: number) => {
+      const score = Math.round(chunk.score * 100);
+      result += `${index + 1}. Page ${chunk.page} (${score}% match)\n`;
+      result += `   📄 "${chunk.preview}"\n\n`;
+    });
+
+    return result;
   }
 }

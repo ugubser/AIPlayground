@@ -7,7 +7,10 @@ import { PromptLogEntry, PromptLoggingService } from '../../services/prompt-logg
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div class="prompt-message" [class.request]="entry.type === 'request'" [class.response]="entry.type === 'response'">
+    <div class="prompt-message" 
+         [class.request]="entry.type === 'request'" 
+         [class.response]="entry.type === 'response'"
+         [class.search-results]="isSearchResults">
       <div class="prompt-header">
         <span class="prompt-label">
           {{ entry.type === 'request' ? '📤' : '📥' }}
@@ -109,6 +112,23 @@ import { PromptLogEntry, PromptLoggingService } from '../../services/prompt-logg
     .prompt-message.request:hover {
       background-color: rgba(253, 126, 20, 0.08);
     }
+
+    .prompt-message.search-results {
+      border-color: #17a2b8;
+      background-color: rgba(23, 162, 184, 0.05);
+    }
+
+    .search-results .prompt-label {
+      color: #17a2b8;
+    }
+
+    .search-results .prompt-text {
+      color: #17a2b8;
+    }
+
+    .prompt-message.search-results:hover {
+      background-color: rgba(23, 162, 184, 0.08);
+    }
   `]
 })
 export class PromptMessageComponent {
@@ -126,6 +146,10 @@ export class PromptMessageComponent {
 
   get isTruncated(): boolean {
     return this.promptLogging.getTruncatedContent(this.entry.content, 3).isTruncated;
+  }
+
+  get isSearchResults(): boolean {
+    return this.entry.provider === 'RAG Search' && this.entry.model === 'Document Search';
   }
 
   toggleExpanded(): void {
