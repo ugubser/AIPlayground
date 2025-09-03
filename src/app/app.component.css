@@ -72,9 +72,57 @@
 .header-controls {
   flex: 1;
   display: flex;
+  align-items: center;
   justify-content: center;
   order: 3;
   margin: 0 var(--space-6);
+  gap: var(--space-4);
+}
+
+.show-prompts-wrapper {
+  flex-shrink: 0;
+}
+
+.show-prompts-checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.show-prompts-checkbox input[type="checkbox"] {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-border);
+  border-radius: 3px;
+  background: var(--color-surface);
+  cursor: pointer;
+  position: relative;
+  transition: all var(--transition-fast);
+}
+
+.show-prompts-checkbox input[type="checkbox"]:checked {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.show-prompts-checkbox input[type="checkbox"]:checked::after {
+  content: '✓';
+  position: absolute;
+  top: -1px;
+  left: 2px;
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.show-prompts-checkbox:hover input[type="checkbox"] {
+  border-color: var(--color-primary);
 }
 
 .model-config-wrapper {

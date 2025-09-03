@@ -5,6 +5,7 @@ import { Auth } from '@angular/fire/auth';
 import { DynamicModelSelection } from './models-config.service';
 import { McpService } from './mcp.service';
 import { McpRegistryService, McpToolCall } from './mcp-registry.service';
+import { PromptLoggingService } from './prompt-logging.service';
 
 export interface ChatSession {
   id?: string;
@@ -33,6 +34,7 @@ export interface ChatSource {
 export interface ChatResponse {
   answer: string;
   sources?: ChatSource[];
+  promptData?: any;
 }
 
 @Injectable({
@@ -48,26 +50,27 @@ export class ChatService {
 
   private generalChat = httpsCallable<{
     message: string;
-  }, { answer: string }>(this.functions, 'generalChat');
+  }, { answer: string; promptData?: any }>(this.functions, 'generalChat');
 
   private visionChat = httpsCallable<{
     message: string;
     imageData: string;
-  }, { answer: string }>(this.functions, 'visionChat');
+  }, { answer: string; promptData?: any }>(this.functions, 'visionChat');
 
   private mcpChat = httpsCallable<{
     message: string;
     tools?: any[];
     llmProvider?: string;
     llmModel?: string;
-  }, { answer: string; toolCalls?: any[] }>(this.functions, 'mcpChat');
+  }, { answer: string; toolCalls?: any[]; promptData?: any }>(this.functions, 'mcpChat');
 
   constructor(
     private firestore: Firestore,
     private functions: Functions,
     private auth: Auth,
     private mcpService: McpService,
-    private mcpRegistry: McpRegistryService
+    private mcpRegistry: McpRegistryService,
+    private promptLogging: PromptLoggingService
   ) { }
 
   async createSession(title?: string, associatedDocuments?: string[]): Promise<string> {
@@ -144,7 +147,8 @@ export class ChatService {
         sessionId,
         message,
         k: 8,
-        restrictDocId
+        restrictDocId,
+        enablePromptLogging: this.promptLogging.isLoggingActive()
       };
 
       // Add model selection if provided
@@ -168,6 +172,50 @@ export class ChatService {
       }
 
       const { data } = await this.chatRag(ragRequest);
+
+      // Log prompt data if enabled
+      if (this.promptLogging.isLoggingActive() && data.promptData) {
+        if (data.promptData.embedRequest) {
+          this.promptLogging.addPromptLog({
+            type: 'request',
+            provider: data.promptData.embedRequest.provider,
+            model: data.promptData.embedRequest.model,
+            content: data.promptData.embedRequest.content,
+            timestamp: new Date(),
+            sessionContext: 'rag'
+          });
+        }
+        if (data.promptData.embedResponse) {
+          this.promptLogging.addPromptLog({
+            type: 'response',
+            provider: data.promptData.embedResponse.provider,
+            model: data.promptData.embedResponse.model,
+            content: data.promptData.embedResponse.content,
+            timestamp: new Date(),
+            sessionContext: 'rag'
+          });
+        }
+        if (data.promptData.llmRequest) {
+          this.promptLogging.addPromptLog({
+            type: 'request',
+            provider: data.promptData.llmRequest.provider,
+            model: data.promptData.llmRequest.model,
+            content: data.promptData.llmRequest.content,
+            timestamp: new Date(),
+            sessionContext: 'rag'
+          });
+        }
+        if (data.promptData.llmResponse) {
+          this.promptLogging.addPromptLog({
+            type: 'response',
+            provider: data.promptData.llmResponse.provider,
+            model: data.promptData.llmResponse.model,
+            content: data.promptData.llmResponse.content,
+            timestamp: new Date(),
+            sessionContext: 'rag'
+          });
+        }
+      }
 
       // Save assistant message
       const assistantMessage: Omit<ChatMessage, 'id'> = {
@@ -222,7 +270,8 @@ export class ChatService {
 
     try {
       const generalRequest: any = {
-        message
+        message,
+        enablePromptLogging: this.promptLogging.isLoggingActive()
       };
 
       // Add model selection if provided
@@ -238,6 +287,30 @@ export class ChatService {
       }
 
       const { data } = await this.generalChat(generalRequest);
+
+      // Log prompt data if enabled
+      if (this.promptLogging.isLoggingActive() && data.promptData) {
+        if (data.promptData.llmRequest) {
+          this.promptLogging.addPromptLog({
+            type: 'request',
+            provider: data.promptData.llmRequest.provider,
+            model: data.promptData.llmRequest.model,
+            content: data.promptData.llmRequest.content,
+            timestamp: new Date(),
+            sessionContext: 'general'
+          });
+        }
+        if (data.promptData.llmResponse) {
+          this.promptLogging.addPromptLog({
+            type: 'response',
+            provider: data.promptData.llmResponse.provider,
+            model: data.promptData.llmResponse.model,
+            content: data.promptData.llmResponse.content,
+            timestamp: new Date(),
+            sessionContext: 'general'
+          });
+        }
+      }
 
       return {
         role: 'assistant',
@@ -273,7 +346,8 @@ export class ChatService {
 
       const visionRequest: any = {
         message: prompt,
-        imageData
+        imageData,
+        enablePromptLogging: this.promptLogging.isLoggingActive()
       };
 
       // Add model selection if provided
@@ -289,6 +363,30 @@ export class ChatService {
       }
 
       const { data } = await this.visionChat(visionRequest);
+
+      // Log prompt data if enabled
+      if (this.promptLogging.isLoggingActive() && data.promptData) {
+        if (data.promptData.visionRequest) {
+          this.promptLogging.addPromptLog({
+            type: 'request',
+            provider: data.promptData.visionRequest.provider,
+            model: data.promptData.visionRequest.model,
+            content: data.promptData.visionRequest.content,
+            timestamp: new Date(),
+            sessionContext: 'vision'
+          });
+        }
+        if (data.promptData.visionResponse) {
+          this.promptLogging.addPromptLog({
+            type: 'response',
+            provider: data.promptData.visionResponse.provider,
+            model: data.promptData.visionResponse.model,
+            content: data.promptData.visionResponse.content,
+            timestamp: new Date(),
+            sessionContext: 'vision'
+          });
+        }
+      }
 
       return {
         role: 'assistant',
@@ -375,7 +473,8 @@ export class ChatService {
 
     try {
       const mcpRequest: any = {
-        message
+        message,
+        enablePromptLogging: this.promptLogging.isLoggingActive()
       };
 
       // Add tools only on initial request (not follow-up)
@@ -401,6 +500,30 @@ export class ChatService {
       }
 
       const { data } = await this.mcpChat(mcpRequest);
+
+      // Log prompt data if enabled
+      if (this.promptLogging.isLoggingActive() && data.promptData) {
+        if (data.promptData.llmRequest) {
+          this.promptLogging.addPromptLog({
+            type: 'request',
+            provider: data.promptData.llmRequest.provider,
+            model: data.promptData.llmRequest.model,
+            content: data.promptData.llmRequest.content,
+            timestamp: new Date(),
+            sessionContext: 'mcp'
+          });
+        }
+        if (data.promptData.llmResponse) {
+          this.promptLogging.addPromptLog({
+            type: 'response',
+            provider: data.promptData.llmResponse.provider,
+            model: data.promptData.llmResponse.model,
+            content: data.promptData.llmResponse.content,
+            timestamp: new Date(),
+            sessionContext: 'mcp'
+          });
+        }
+      }
 
       return {
         answer: data.answer,

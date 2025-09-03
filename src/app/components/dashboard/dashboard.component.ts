@@ -1,6 +1,7 @@
 import { Component, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewChecked } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { PromptMessageComponent } from '../prompt-message/prompt-message.component';
 
 import { PdfProcessorService, ChunkData } from '../../services/pdf-processor.service';
 import { DocumentService, DocumentData } from '../../services/document.service';
@@ -14,6 +15,7 @@ import { APP_CONSTANTS } from '../../config/app-constants';
 import { ErrorHandlerService } from '../../services/error-handler.service';
 import { LoggingService } from '../../services/logging.service';
 import { SharedUtilsService } from '../../utils/shared-utils.service';
+import { PromptLoggingService, PromptLogEntry } from '../../services/prompt-logging.service';
 
 interface VisionMessage {
   role: 'user' | 'assistant';
@@ -26,7 +28,7 @@ interface VisionMessage {
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, PromptMessageComponent],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.css'
 })
@@ -69,6 +71,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
   // Track timeouts for cleanup
   private timeouts: any[] = [];
 
+  // Prompt logging
+  promptLogs: PromptLogEntry[] = [];
+
   // Vision functionality
   selectedImage: { url: string; name: string; size: number; file: File } | null = null;
   visionDragOver = false;
@@ -87,7 +92,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
     private mcpRegistry: McpRegistryService,
     private errorHandler: ErrorHandlerService,
     private logger: LoggingService,
-    private utils: SharedUtilsService
+    private utils: SharedUtilsService,
+    private promptLogging: PromptLoggingService
   ) {}
 
   private scrollToBottom(container: ElementRef, smooth: boolean = true) {
@@ -119,6 +125,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.loadUserData();
     this.initializeMcpRegistry();
+    this.initializePromptLogging();
+  }
+
+  private initializePromptLogging() {
+    this.promptLogging.promptLogs$.subscribe(logs => {
+      this.promptLogs = logs;
+    });
   }
 
   private initializeMcpRegistry() {
@@ -859,6 +872,14 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   getEnabledServersCount(): number {
     return this.mcpServers.filter(s => s.enabled && s.status === 'online').length;
+  }
+
+  getPromptLogsForContext(context: 'rag' | 'general' | 'vision' | 'mcp'): PromptLogEntry[] {
+    return this.promptLogs.filter(log => log.sessionContext === context);
+  }
+
+  trackByPromptId(index: number, item: PromptLogEntry): string {
+    return item.id;
   }
 
   ngOnDestroy() {

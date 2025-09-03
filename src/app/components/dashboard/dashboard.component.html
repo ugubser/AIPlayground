@@ -213,30 +213,39 @@
 
         <div class="messages-container" *ngIf="currentSession">
           <div class="messages-list" #ragMessagesContainer>
-            <div 
-              class="message"
-              *ngFor="let message of messages"
-              [class.user-message]="message.role === 'user'"
-              [class.assistant-message]="message.role === 'assistant'">
-              
-              <div class="message-content">
-                <div class="message-text">{{ message.content }}</div>
-                <div class="message-sources" *ngIf="message.sources && message.sources.length > 0">
-                  <h5>Sources:</h5>
-                  <div class="source-tags">
-                    <span 
-                      class="source-tag" 
-                      *ngFor="let source of message.sources">
-                      {{ source.label }}
-                    </span>
+            <ng-container *ngFor="let message of messages; let i = index">
+              <div 
+                class="message"
+                [class.user-message]="message.role === 'user'"
+                [class.assistant-message]="message.role === 'assistant'">
+                
+                <div class="message-content">
+                  <div class="message-text">{{ message.content }}</div>
+                  <div class="message-sources" *ngIf="message.sources && message.sources.length > 0">
+                    <h5>Sources:</h5>
+                    <div class="source-tags">
+                      <span 
+                        class="source-tag" 
+                        *ngFor="let source of message.sources">
+                        {{ source.label }}
+                      </span>
+                    </div>
                   </div>
                 </div>
+                
+                <div class="message-time">
+                  {{ message.createdAt.toLocaleTimeString() }}
+                </div>
               </div>
-              
-              <div class="message-time">
-                {{ message.createdAt.toLocaleTimeString() }}
-              </div>
-            </div>
+
+              <!-- Show prompt logs after assistant messages -->
+              <ng-container *ngIf="message.role === 'assistant'">
+                <app-prompt-message 
+                  *ngFor="let promptLog of getPromptLogsForContext('rag'); trackBy: trackByPromptId"
+                  [entry]="promptLog">
+                </app-prompt-message>
+              </ng-container>
+            </ng-container>
 
             <div class="message assistant-message" *ngIf="sending">
               <div class="message-content">
@@ -321,20 +330,29 @@
 
       <div class="messages-container">
         <div class="messages-list" #generalMessagesContainer>
-          <div 
-            class="message"
-            *ngFor="let message of generalMessages"
-            [class.user-message]="message.role === 'user'"
-            [class.assistant-message]="message.role === 'assistant'">
-            
-            <div class="message-content">
-              <div class="message-text">{{ message.content }}</div>
+          <ng-container *ngFor="let message of generalMessages; let i = index">
+            <div 
+              class="message"
+              [class.user-message]="message.role === 'user'"
+              [class.assistant-message]="message.role === 'assistant'">
+              
+              <div class="message-content">
+                <div class="message-text">{{ message.content }}</div>
+              </div>
+              
+              <div class="message-time">
+                {{ message.createdAt.toLocaleTimeString() }}
+              </div>
             </div>
-            
-            <div class="message-time">
-              {{ message.createdAt.toLocaleTimeString() }}
-            </div>
-          </div>
+
+            <!-- Show prompt logs after assistant messages -->
+            <ng-container *ngIf="message.role === 'assistant'">
+              <app-prompt-message 
+                *ngFor="let promptLog of getPromptLogsForContext(mcpEnabled ? 'mcp' : 'general'); trackBy: trackByPromptId"
+                [entry]="promptLog">
+              </app-prompt-message>
+            </ng-container>
+          </ng-container>
 
           <div class="message assistant-message" *ngIf="sendingGeneral">
             <div class="message-content">
@@ -439,26 +457,35 @@
         <div class="vision-results" *ngIf="visionMessages.length > 0">
           <h4>Analysis Results</h4>
           <div class="vision-messages" #visionMessagesContainer>
-            <div 
-              class="vision-message"
-              *ngFor="let message of visionMessages; let i = index"
-              [class.user-message]="message.role === 'user'"
-              [class.assistant-message]="message.role === 'assistant'">
-              
-              <div class="message-content">
-                <div class="message-image" *ngIf="message.image">
-                  <img [src]="message.image.url" [alt]="message.image.name" class="message-image-preview">
+            <ng-container *ngFor="let message of visionMessages; let i = index">
+              <div 
+                class="vision-message"
+                [class.user-message]="message.role === 'user'"
+                [class.assistant-message]="message.role === 'assistant'">
+                
+                <div class="message-content">
+                  <div class="message-image" *ngIf="message.image">
+                    <img [src]="message.image.url" [alt]="message.image.name" class="message-image-preview">
+                  </div>
+                  <div class="message-text" *ngIf="message.content">{{ message.content }}</div>
+                  <div class="message-prompt" *ngIf="message.prompt">
+                    <strong>Prompt:</strong> {{ message.prompt }}
+                  </div>
                 </div>
-                <div class="message-text" *ngIf="message.content">{{ message.content }}</div>
-                <div class="message-prompt" *ngIf="message.prompt">
-                  <strong>Prompt:</strong> {{ message.prompt }}
+                
+                <div class="message-time">
+                  {{ message.createdAt.toLocaleTimeString() }}
                 </div>
               </div>
-              
-              <div class="message-time">
-                {{ message.createdAt.toLocaleTimeString() }}
-              </div>
-            </div>
+
+              <!-- Show prompt logs after assistant messages -->
+              <ng-container *ngIf="message.role === 'assistant'">
+                <app-prompt-message 
+                  *ngFor="let promptLog of getPromptLogsForContext('vision'); trackBy: trackByPromptId"
+                  [entry]="promptLog">
+                </app-prompt-message>
+              </ng-container>
+            </ng-container>
 
             <div class="vision-message assistant-message" *ngIf="sendingVision">
               <div class="message-content">

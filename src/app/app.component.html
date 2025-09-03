@@ -20,6 +20,16 @@
       
       <!-- Global Model Configuration -->
       <div class="header-controls" *ngIf="user$ | async">
+        <div class="show-prompts-wrapper">
+          <label class="show-prompts-checkbox">
+            <input 
+              type="checkbox" 
+              [(ngModel)]="showPrompts"
+              (change)="onShowPromptsToggle()">
+            <span class="checkmark"></span>
+            Show Prompts
+          </label>
+        </div>
         <div class="model-config-wrapper">
           <app-dynamic-model-selector 
             [appName]="currentAppName"

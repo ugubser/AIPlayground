@@ -339,7 +339,8 @@ export const chatRag = functions
       llmProvider,
       llmModel,
       embedProvider,
-      embedModel
+      embedModel,
+      enablePromptLogging = false
     } = data;
 
     // Use provided models from UI - these should always be provided by the frontend
@@ -660,10 +661,43 @@ export const chatRag = functions
 
       console.log(`Successfully generated response with ${sources.length} sources`);
 
-      return {
+      const result: any = {
         answer,
         sources
       };
+
+      // Add prompt data if logging is enabled
+      if (enablePromptLogging) {
+        result.promptData = {
+          embedRequest: {
+            provider: actualEmbedProvider,
+            model: actualEmbedModel,
+            content: JSON.stringify(queryRequestBody, null, 2)
+          },
+          embedResponse: {
+            provider: actualEmbedProvider,
+            model: actualEmbedModel, 
+            content: `Status: ${embResponse.status}\nVector length: ${queryVector.length}`
+          },
+          llmRequest: {
+            provider: actualLlmProvider,
+            model: actualLlmModel,
+            content: JSON.stringify(llmRequestBody, null, 2)
+          },
+          llmResponse: {
+            provider: actualLlmProvider,
+            model: actualLlmModel,
+            content: JSON.stringify({
+              status: llmResponse.status,
+              model: llmJson.model,
+              usage: llmJson.usage,
+              choices: llmJson.choices
+            }, null, 2)
+          }
+        };
+      }
+
+      return result;
 
     } catch (error) {
       console.error('Error in chatRag:', error);
@@ -681,7 +715,7 @@ export const generalChat = functions
       throw new functions.https.HttpsError('unauthenticated', 'Login required');
     }
 
-    const { message, llmProvider, llmModel } = data;
+    const { message, llmProvider, llmModel, enablePromptLogging = false } = data;
 
     // Use provided models from UI - these should always be provided by the frontend
     // Fallback to config defaults only if UI doesn't provide them
@@ -767,7 +801,30 @@ export const generalChat = functions
 
       console.log(`Successfully generated general chat response`);
 
-      return { answer };
+      const result: any = { answer };
+
+      // Add prompt data if logging is enabled
+      if (enablePromptLogging) {
+        result.promptData = {
+          llmRequest: {
+            provider: actualLlmProvider,
+            model: actualLlmModel,
+            content: JSON.stringify(llmRequestBody, null, 2)
+          },
+          llmResponse: {
+            provider: actualLlmProvider,
+            model: actualLlmModel,
+            content: JSON.stringify({
+              status: llmResponse.status,
+              model: llmJson.model,
+              usage: llmJson.usage,
+              choices: llmJson.choices
+            }, null, 2)
+          }
+        };
+      }
+
+      return result;
 
     } catch (error) {
       console.error('Error in generalChat:', error);
@@ -785,7 +842,7 @@ export const mcpChat = functions
       throw new functions.https.HttpsError('unauthenticated', 'Login required');
     }
 
-    const { message, llmProvider, llmModel, tools, toolResults } = data;
+    const { message, llmProvider, llmModel, tools, toolResults, enablePromptLogging = false } = data;
 
     // Use provided models from UI
     const defaults = modelsConfigService.getDefaultSelection('chat') as any;
@@ -923,10 +980,32 @@ export const mcpChat = functions
             : tc.function.arguments
         }));
 
-        return {
+        const result: any = {
           answer: message_content.content || 'I need to use some tools to answer your question.',
           toolCalls: toolCalls
         };
+
+        if (enablePromptLogging) {
+          result.promptData = {
+            llmRequest: {
+              provider: actualLlmProvider,
+              model: actualLlmModel,
+              content: JSON.stringify(llmRequestBody, null, 2)
+            },
+            llmResponse: {
+              provider: actualLlmProvider,
+              model: actualLlmModel,
+              content: JSON.stringify({
+                status: llmResponse.status,
+                model: llmJson.model,
+                usage: llmJson.usage,
+                choices: llmJson.choices
+              }, null, 2)
+            }
+          };
+        }
+
+        return result;
       }
 
       // Regular response (either no tools or post-tool execution)
@@ -943,7 +1022,29 @@ export const mcpChat = functions
         }, null, 2));
       }
 
-      return { answer };
+      const result: any = { answer };
+
+      if (enablePromptLogging) {
+        result.promptData = {
+          llmRequest: {
+            provider: actualLlmProvider,
+            model: actualLlmModel,
+            content: JSON.stringify(llmRequestBody, null, 2)
+          },
+          llmResponse: {
+            provider: actualLlmProvider,
+            model: actualLlmModel,
+            content: JSON.stringify({
+              status: llmResponse.status,
+              model: llmJson.model,
+              usage: llmJson.usage,
+              choices: llmJson.choices
+            }, null, 2)
+          }
+        };
+      }
+
+      return result;
 
     } catch (error) {
       console.error('Error in mcpChat:', error);
@@ -961,7 +1062,7 @@ export const visionChat = functions
       throw new functions.https.HttpsError('unauthenticated', 'Login required');
     }
 
-    const { message, imageData, visionProvider, visionModel } = data;
+    const { message, imageData, visionProvider, visionModel, enablePromptLogging = false } = data;
 
     // Use provided models from UI - these should always be provided by the frontend
     // Fallback to config defaults only if UI doesn't provide them
@@ -1068,7 +1169,29 @@ export const visionChat = functions
 
       console.log(`Successfully generated vision response`);
 
-      return { answer };
+      const result: any = { answer };
+
+      if (enablePromptLogging) {
+        result.promptData = {
+          visionRequest: {
+            provider: actualVisionProvider,
+            model: actualVisionModel,
+            content: JSON.stringify(visionRequestBody, null, 2)
+          },
+          visionResponse: {
+            provider: actualVisionProvider,
+            model: actualVisionModel,
+            content: JSON.stringify({
+              status: visionResponse.status,
+              model: visionJson.model,
+              usage: visionJson.usage,
+              choices: visionJson.choices
+            }, null, 2)
+          }
+        };
+      }
+
+      return result;
 
     } catch (error) {
       console.error('Error in visionChat:', error);
