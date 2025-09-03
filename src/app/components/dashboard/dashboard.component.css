@@ -25,6 +25,16 @@
   border-radius: var(--radius-md);
 }
 
+/* MCP Settings in sidebar */
+.chat-sidebar .mcp-settings,
+.rag-sidebar .mcp-settings {
+  margin-top: 0;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 0;
+  background: transparent;
+}
+
 .mcp-checkbox {
   display: flex;
   align-items: center;
@@ -231,7 +241,7 @@
 
 /* Documents Section */
 .documents-section {
-  padding: 2rem;
+  padding: 1.4rem;
   /* height: 100%; */
   overflow-y: auto;
 }
@@ -239,9 +249,9 @@
 .upload-area {
   border: 2px dashed var(--color-border);
   border-radius: var(--radius-lg);
-  padding: var(--space-8) var(--space-6);
+  padding: var(--space-5) var(--space-4);
   text-align: center;
-  margin-bottom: var(--space-6);
+  margin-bottom: var(--space-4);
   transition: all var(--transition-base);
   background: var(--color-surface-elevated);
   position: relative;
@@ -282,8 +292,8 @@
 }
 
 .upload-icon {
-  font-size: 3rem;
-  margin-bottom: var(--space-4);
+  font-size: 2.1rem;
+  margin-bottom: var(--space-3);
   opacity: 0.8;
   transition: all var(--transition-base);
 }
@@ -294,15 +304,16 @@
 }
 
 .upload-area h4 {
-  margin-bottom: var(--space-2);
+  margin-bottom: var(--space-1);
   color: var(--color-text-primary);
   font-weight: var(--font-weight-semibold);
+  font-size: 0.95rem;
 }
 
 .upload-area p {
   color: var(--color-text-secondary);
-  margin-bottom: var(--space-6);
-  font-size: 0.875rem;
+  margin-bottom: var(--space-4);
+  font-size: 0.61rem;
 }
 
 .upload-progress {
@@ -335,8 +346,9 @@
 
 /* Documents List */
 .documents-list h3 {
-  margin-bottom: 1rem;
+  margin-bottom: 0.7rem;
   color: var(--color-text-primary);
+  font-size: 1.05rem;
 }
 
 .document-grid {
@@ -349,12 +361,12 @@
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 8px;
-  padding: 1.5rem;
+  padding: 1.05rem;
   cursor: pointer;
   transition: all 0.2s;
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.7rem;
 }
 
 .document-card:hover {
@@ -376,7 +388,7 @@
 }
 
 .doc-icon {
-  font-size: 2rem;
+  font-size: 1.4rem;
   flex-shrink: 0;
 }
 
@@ -395,8 +407,8 @@
 }
 
 .doc-info h4 {
-  margin: 0 0 0.5rem 0;
-  font-size: 1rem;
+  margin: 0 0 0.35rem 0;
+  font-size: 0.7rem;
   font-weight: 600;
   color: var(--color-text-primary);
   overflow: hidden;
@@ -407,8 +419,8 @@
 .doc-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  font-size: 0.8rem;
+  gap: 0.35rem;
+  font-size: 0.56rem;
   color: var(--color-text-secondary);
 }
 
@@ -456,7 +468,7 @@
 }
 
 .sidebar-header {
-  padding: var(--space-5);
+  padding: var(--space-3);
   border-bottom: 1px solid var(--color-border);
   display: flex;
   justify-content: space-between;
@@ -466,7 +478,7 @@
 
 .sidebar-header h3 {
   margin: 0;
-  font-size: 1.125rem;
+  font-size: 0.79rem;
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
 }
@@ -481,13 +493,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-4);
+  padding: var(--space-3);
   border-radius: var(--radius-md);
   cursor: pointer;
   margin-bottom: var(--space-1);
   transition: all var(--transition-fast);
   border: 1px solid transparent;
-  gap: var(--space-2);
+  gap: var(--space-1);
 }
 
 .session-item:hover {
@@ -505,15 +517,15 @@
 .session-title {
   font-weight: var(--font-weight-medium);
   color: var(--color-text-primary);
-  margin-bottom: var(--space-1);
+  margin-bottom: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.875rem;
+  font-size: 0.61rem;
 }
 
 .session-date {
-  font-size: 0.75rem;
+  font-size: 0.525rem;
   color: var(--color-text-subtle);
   font-weight: var(--font-weight-regular);
 }
@@ -568,7 +580,7 @@
 }
 
 .chat-header {
-  padding: var(--space-6);
+  padding: var(--space-4);
   border-bottom: 1px solid var(--color-border);
   background: var(--color-surface);
   display: flex;
@@ -579,7 +591,7 @@
 
 .chat-header h2 {
   margin: 0;
-  font-size: 1.375rem;
+  font-size: 0.96rem;
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
   letter-spacing: -0.025em;
@@ -607,14 +619,14 @@
 
 .messages-list {
   flex: 1;
-  padding: var(--space-6);
+  padding: var(--space-4);
   overflow-y: auto;
   background: var(--color-background);
   scroll-behavior: smooth;
 }
 
 .message {
-  margin-bottom: var(--space-6);
+  margin-bottom: var(--space-4);
   display: flex;
   flex-direction: column;
   animation: fadeInUp 0.3s ease;
@@ -641,7 +653,7 @@
 
 .message-content {
   max-width: 70%;
-  padding: var(--space-5);
+  padding: var(--space-3);
   border-radius: var(--radius-xl);
   position: relative;
   box-shadow: var(--shadow-sm);
@@ -662,15 +674,15 @@
 }
 
 .message-text {
-  line-height: 1.5;
+  line-height: 1.4;
   white-space: pre-wrap;
-  font-size: 0.9375rem;
+  font-size: 0.66rem;
   word-wrap: break-word;
 }
 
 .message-sources {
-  margin-top: var(--space-4);
-  padding-top: var(--space-4);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
   border-top: 1px solid rgba(255,255,255,0.15);
 }
 
@@ -679,8 +691,8 @@
 }
 
 .message-sources h5 {
-  margin: 0 0 var(--space-2) 0;
-  font-size: 0.75rem;
+  margin: 0 0 var(--space-1) 0;
+  font-size: 0.525rem;
   font-weight: var(--font-weight-semibold);
   opacity: 0.8;
   text-transform: uppercase;
@@ -690,14 +702,14 @@
 .source-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
+  gap: var(--space-1);
 }
 
 .source-tag {
   background: rgba(255,255,255,0.2);
-  padding: var(--space-1) var(--space-3);
+  padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-sm);
-  font-size: 0.6875rem;
+  font-size: 0.48rem;
   font-weight: var(--font-weight-medium);
   border: 1px solid rgba(255,255,255,0.1);
   backdrop-filter: blur(4px);
@@ -744,7 +756,7 @@
 }
 
 .message-input-area {
-  padding: var(--space-6);
+  padding: var(--space-4);
   background: var(--color-surface);
   border-top: 1px solid var(--color-border);
   backdrop-filter: blur(10px);
@@ -761,14 +773,14 @@
 
 .message-input {
   flex: 1;
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-2) var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
   resize: vertical;
-  min-height: 44px;
-  max-height: 120px;
+  min-height: 32px;
+  max-height: 84px;
   font-family: var(--font-family-primary);
-  font-size: 0.9375rem;
+  font-size: 0.66rem;
   background: var(--color-surface);
   color: var(--color-text-primary);
   transition: all var(--transition-fast);
@@ -786,15 +798,15 @@
 }
 
 .send-btn {
-  padding: var(--space-3);
+  padding: var(--space-2);
   background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%);
   color: var(--color-white);
   border: none;
   border-radius: 50%;
   cursor: pointer;
   transition: all var(--transition-fast);
-  width: 44px;
-  height: 44px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -832,34 +844,31 @@
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: var(--space-12);
+  padding: var(--space-8);
   background: var(--color-background);
 }
 
 .empty-chat h3 {
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-3);
   color: var(--color-text-primary);
   font-weight: var(--font-weight-semibold);
-  font-size: 1.5rem;
+  font-size: 1.05rem;
 }
 
 .empty-chat p {
   color: var(--color-text-secondary);
-  margin-bottom: var(--space-8);
-  max-width: 400px;
-  font-size: 1.0625rem;
-  line-height: 1.6;
+  margin-bottom: var(--space-5);
+  max-width: 280px;
+  font-size: 0.74rem;
+  line-height: 1.5;
 }
 
 /* Enhanced Responsive Design */
 @media (max-width: 1024px) {
-  .rag-sidebar {
+  .rag-sidebar,
+  .chat-sidebar,
+  .vision-sidebar {
     width: 300px;
-  }
-  
-  .general-chat-container {
-    padding: var(--space-6);
-    margin: var(--space-2);
   }
 }
 
@@ -868,18 +877,24 @@
     height: calc(100vh - 100px);
   }
   
-  .rag-layout {
+  .rag-layout,
+  .chat-layout,
+  .vision-layout {
     flex-direction: column;
   }
   
-  .rag-sidebar {
+  .rag-sidebar,
+  .chat-sidebar,
+  .vision-sidebar {
     width: 100%;
-    height: 300px;
+    height: 200px;
     border-right: none;
     border-bottom: 1px solid var(--color-border);
   }
   
-  .rag-main {
+  .rag-main,
+  .chat-main,
+  .vision-main {
     border-radius: 0;
   }
 
@@ -889,11 +904,6 @@
   
   .header-content {
     gap: var(--space-3);
-  }
-  
-  .general-chat-container {
-    padding: var(--space-4);
-    margin: var(--space-1);
   }
 }
 
@@ -919,9 +929,6 @@
     padding: var(--space-4);
   }
   
-  .general-chat-header h3 {
-    font-size: 1.25rem;
-  }
 }
 
 /* Enhanced Button Styles - Extending global styles */
@@ -951,7 +958,23 @@
   gap: var(--space-1);
 }
 
-.rag-sidebar {
+/* Chat Layout */
+.chat-layout {
+  display: flex;
+  height: 100%;
+  gap: var(--space-1);
+}
+
+/* Vision Layout */
+.vision-layout {
+  display: flex;
+  height: 100%;
+  gap: var(--space-1);
+}
+
+.rag-sidebar,
+.chat-sidebar,
+.vision-sidebar {
   width: 360px;
   background: var(--color-surface);
   border-right: 1px solid var(--color-border);
@@ -961,7 +984,9 @@
   box-shadow: var(--shadow-sm);
 }
 
-.rag-main {
+.rag-main,
+.chat-main,
+.vision-main {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -972,14 +997,14 @@
 
 /* Upload Section */
 .upload-section {
-  padding: var(--space-5);
+  padding: var(--space-3);
   border-bottom: 1px solid var(--color-border);
 }
 
 .upload-section .upload-area {
   border: 2px dashed var(--color-border);
   border-radius: var(--radius-md);
-  padding: var(--space-6) var(--space-4);
+  padding: var(--space-4) var(--space-3);
   text-align: center;
   transition: all var(--transition-base);
   background: var(--color-surface-elevated);
@@ -997,19 +1022,19 @@
 }
 
 .upload-section .upload-icon {
-  font-size: 1.5rem;
-  margin-bottom: 0.5rem;
+  font-size: 1.05rem;
+  margin-bottom: 0.35rem;
 }
 
 .upload-section h4 {
-  margin: 0 0 0.25rem 0;
-  font-size: 0.9rem;
+  margin: 0 0 0.15rem 0;
+  font-size: 0.63rem;
   color: var(--color-text-primary);
 }
 
 .upload-section p {
-  margin: 0 0 1rem 0;
-  font-size: 0.8rem;
+  margin: 0 0 0.7rem 0;
+  font-size: 0.56rem;
   color: var(--color-text-secondary);
 }
 
@@ -1024,29 +1049,29 @@
 
 /* Documents Section */
 .documents-section {
-  padding: 1rem;
+  padding: 0.7rem;
   border-bottom: 1px solid var(--color-border);
 }
 
 .documents-section h4 {
-  margin: 0 0 0.75rem 0;
-  font-size: 0.9rem;
+  margin: 0 0 0.5rem 0;
+  font-size: 0.63rem;
   color: var(--color-text-primary);
 }
 
 .document-list {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  max-height: 150px;
+  gap: 0.35rem;
+  max-height: 105px;
   overflow-y: auto;
 }
 
 .document-item {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3);
+  gap: var(--space-2);
+  padding: var(--space-2);
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: all var(--transition-fast);
@@ -1103,7 +1128,7 @@
 }
 
 .document-item .doc-name {
-  font-size: 0.8rem;
+  font-size: 0.56rem;
   font-weight: 500;
   color: var(--color-text-primary);
   overflow: hidden;
@@ -1345,41 +1370,6 @@
 }
 
 /* General Chat Container */
-.general-chat-container {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  padding: var(--space-8);
-  background: var(--color-surface);
-  border-radius: var(--radius-lg);
-  margin: var(--space-4);
-  box-shadow: var(--shadow-sm);
-}
-
-.general-chat-header {
-  text-align: center;
-  margin-bottom: var(--space-8);
-  padding: var(--space-6);
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
-  background-clip: text;
-  -webkit-background-clip: text;
-  border-radius: var(--radius-lg);
-}
-
-.general-chat-header h3 {
-  margin: 0 0 var(--space-2) 0;
-  color: var(--color-text-primary);
-  font-size: 1.5rem;
-  font-weight: var(--font-weight-bold);
-  letter-spacing: -0.025em;
-}
-
-.general-chat-header p {
-  margin: 0;
-  color: var(--color-text-secondary);
-  font-size: 1.0625rem;
-  line-height: 1.6;
-}
 
 /* RAG Chat Empty State */
 .rag-chat-empty {
@@ -1387,7 +1377,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 3rem;
+  padding: 2.1rem;
 }
 
 .empty-chat-message {
@@ -1396,77 +1386,46 @@
 }
 
 .empty-chat-message h4 {
-  margin: 0 0 1rem 0;
+  margin: 0 0 0.7rem 0;
   color: var(--color-text-primary);
-  font-size: 1.2rem;
+  font-size: 0.84rem;
   font-weight: 600;
 }
 
 .empty-chat-message p {
   margin: 0;
   color: var(--color-text-secondary);
-  font-size: 0.95rem;
-  line-height: 1.5;
+  font-size: 0.67rem;
+  line-height: 1.4;
 }
 
-/* Vision Tab Styles */
-.vision-container {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  padding: var(--space-6);
-  background: var(--color-surface);
-  border-radius: var(--radius-lg);
-  margin: var(--space-4);
-  box-shadow: var(--shadow-sm);
-}
-
-.vision-header {
-  text-align: center;
-  margin-bottom: var(--space-6);
-  padding: var(--space-4);
-}
-
-.vision-header h3 {
-  margin: 0 0 var(--space-2) 0;
-  color: var(--color-text-primary);
-  font-size: 1.5rem;
-  font-weight: var(--font-weight-bold);
-  letter-spacing: -0.025em;
-}
-
-.vision-header p {
-  margin: 0;
-  color: var(--color-text-secondary);
-  font-size: 1.0625rem;
-  line-height: 1.6;
-}
-
-.vision-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
-  overflow: hidden;
-}
-
+/* Vision Tab Styles - Updated for sidebar layout */
 .vision-upload-section {
-  flex-shrink: 0;
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
 }
+
 
 .image-upload-area {
   border: 2px dashed var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-6);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
   text-align: center;
   transition: all var(--transition-base);
   background: var(--color-surface-elevated);
   cursor: pointer;
   position: relative;
-  min-height: 200px;
+  min-height: 120px;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Vision upload area in sidebar */
+.vision-sidebar .image-upload-area {
+  border-radius: var(--radius-sm);
+  min-height: 100px;
+  padding: var(--space-2);
 }
 
 .image-upload-area.drag-over {
@@ -1486,41 +1445,42 @@
 }
 
 .upload-content .upload-icon {
-  font-size: 3rem;
-  margin-bottom: var(--space-4);
+  font-size: 2.1rem;
+  margin-bottom: var(--space-3);
   opacity: 0.8;
 }
 
 .upload-content h4 {
-  margin-bottom: var(--space-2);
+  margin-bottom: var(--space-1);
   color: var(--color-text-primary);
   font-weight: var(--font-weight-semibold);
+  font-size: 0.95rem;
 }
 
 .upload-content p {
   color: var(--color-text-secondary);
-  margin-bottom: var(--space-2);
-  font-size: 0.875rem;
+  margin-bottom: var(--space-1);
+  font-size: 0.61rem;
 }
 
 .supported-formats {
-  font-size: 0.75rem !important;
+  font-size: 0.525rem !important;
   font-style: italic;
   opacity: 0.7;
-  margin-bottom: var(--space-4) !important;
+  margin-bottom: var(--space-3) !important;
 }
 
 .image-preview {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-3);
   width: 100%;
 }
 
 .preview-image {
   max-width: 100%;
-  max-height: 200px;
+  max-height: 140px;
   width: auto;
   height: auto;
   border-radius: var(--radius-md);
@@ -1535,32 +1495,39 @@
 .image-name {
   font-weight: var(--font-weight-medium);
   color: var(--color-text-primary);
-  font-size: 0.9rem;
+  font-size: 0.63rem;
   margin-bottom: var(--space-1);
 }
 
 .image-size {
-  font-size: 0.8rem;
+  font-size: 0.56rem;
   color: var(--color-text-secondary);
 }
 
 .vision-input-area {
-  margin-top: var(--space-4);
+  margin-top: var(--space-3);
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-3);
+}
+
+/* Vision input area in sidebar */
+.vision-sidebar .vision-input-area {
+  padding: var(--space-2);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-background);
 }
 
 .vision-prompt-input {
   width: 100%;
-  padding: var(--space-4);
+  padding: var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   resize: vertical;
-  min-height: 80px;
-  max-height: 120px;
+  min-height: 56px;
+  max-height: 84px;
   font-family: var(--font-family-primary);
-  font-size: 0.9375rem;
+  font-size: 0.66rem;
   background: var(--color-surface);
   color: var(--color-text-primary);
   transition: all var(--transition-fast);
@@ -1584,25 +1551,25 @@
 }
 
 .vision-results h4 {
-  margin: 0 0 var(--space-4) 0;
+  margin: 0 0 var(--space-3) 0;
   color: var(--color-text-primary);
-  font-size: 1.125rem;
+  font-size: 0.79rem;
   font-weight: var(--font-weight-semibold);
-  padding-bottom: var(--space-2);
+  padding-bottom: var(--space-1);
   border-bottom: 1px solid var(--color-border);
 }
 
 .vision-messages {
   flex: 1;
   overflow-y: auto;
-  padding: var(--space-4);
+  padding: var(--space-3);
   background: var(--color-background);
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
 }
 
 .vision-message {
-  margin-bottom: var(--space-6);
+  margin-bottom: var(--space-4);
   display: flex;
   flex-direction: column;
   animation: fadeInUp 0.3s ease;
@@ -1618,7 +1585,7 @@
 
 .vision-message .message-content {
   max-width: 85%;
-  padding: var(--space-5);
+  padding: var(--space-3);
   border-radius: var(--radius-xl);
   position: relative;
   box-shadow: var(--shadow-sm);
@@ -1639,12 +1606,12 @@
 }
 
 .message-image {
-  margin-bottom: var(--space-3);
+  margin-bottom: var(--space-2);
 }
 
 .message-image-preview {
-  max-width: 150px;
-  max-height: 150px;
+  max-width: 105px;
+  max-height: 105px;
   width: auto;
   height: auto;
   border-radius: var(--radius-sm);
@@ -1653,18 +1620,18 @@
 }
 
 .message-text {
-  line-height: 1.5;
+  line-height: 1.4;
   white-space: pre-wrap;
-  font-size: 0.9375rem;
+  font-size: 0.66rem;
   word-wrap: break-word;
 }
 
 .message-prompt {
-  margin-bottom: var(--space-2);
-  padding: var(--space-2);
+  margin-bottom: var(--space-1);
+  padding: var(--space-1);
   background: rgba(255, 255, 255, 0.1);
   border-radius: var(--radius-sm);
-  font-size: 0.8125rem;
+  font-size: 0.57rem;
 }
 
 .vision-message.assistant-message .message-prompt {
@@ -1673,9 +1640,9 @@
 }
 
 .message-time {
-  font-size: 0.7rem;
+  font-size: 0.49rem;
   color: var(--color-text-subtle);
-  margin-top: var(--space-2);
+  margin-top: var(--space-1);
   opacity: 0.7;
 }
 

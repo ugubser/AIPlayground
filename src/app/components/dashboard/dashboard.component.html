@@ -292,10 +292,11 @@
 
   <!-- Chat Tab -->
   <div class="tab-content" *ngIf="activeTab === 'chat'">
-    <div class="general-chat-container">
-      <div class="general-chat-header">
-        <h3>💬 General Chat</h3>
-        <p>Ask any question - no documents required!</p>
+    <div class="chat-layout">
+      <div class="chat-sidebar">
+        <div class="sidebar-header">
+          <h3>💬 Chat Settings</h3>
+        </div>
         
         <div class="mcp-settings">
           <label class="mcp-checkbox">
@@ -327,6 +328,11 @@
           </div>
         </div>
       </div>
+
+      <div class="chat-main">
+        <div class="chat-header">
+          <h2>General Chat</h2>
+        </div>
 
       <div class="messages-container">
         <div class="messages-list" #generalMessagesContainer>
@@ -382,18 +388,18 @@
           </div>
         </div>
       </div>
+      </div>
     </div>
   </div>
 
   <!-- Vision Tab -->
   <div class="tab-content" *ngIf="activeTab === 'vision'">
-    <div class="vision-container">
-      <div class="vision-header">
-        <h3>👁️ Vision Analysis</h3>
-        <p>Upload an image and let AI analyze it for you!</p>
-      </div>
-
-      <div class="vision-content">
+    <div class="vision-layout">
+      <div class="vision-sidebar">
+        <div class="sidebar-header">
+          <h3>👁️ Image Upload</h3>
+        </div>
+        
         <!-- Image Upload Section -->
         <div class="vision-upload-section">
           <div class="image-upload-area" 
@@ -452,6 +458,12 @@
             </button>
           </div>
         </div>
+      </div>
+
+      <div class="vision-main">
+        <div class="chat-header">
+          <h2>Vision Analysis</h2>
+        </div>
 
         <!-- Vision Results Section -->
         <div class="vision-results" *ngIf="visionMessages.length > 0">
@@ -495,6 +507,11 @@
               </div>
             </div>
           </div>
+        </div>
+
+        <div class="empty-chat" *ngIf="visionMessages.length === 0">
+          <h3>Upload an image to get started! 📸</h3>
+          <p>Select an image from the sidebar and ask questions about it.</p>
         </div>
       </div>
     </div>
