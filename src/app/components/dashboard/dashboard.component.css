@@ -249,9 +249,9 @@
 .upload-area {
   border: 2px dashed var(--color-border);
   border-radius: var(--radius-lg);
-  padding: var(--space-5) var(--space-4);
+  padding: var(--space-1) var(--space-1);
   text-align: center;
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-1);
   transition: all var(--transition-base);
   background: var(--color-surface-elevated);
   position: relative;
@@ -292,8 +292,8 @@
 }
 
 .upload-icon {
-  font-size: 2.1rem;
-  margin-bottom: var(--space-3);
+  font-size: 1.2rem;
+  margin-bottom: var(--space-1);
   opacity: 0.8;
   transition: all var(--transition-base);
 }
@@ -304,16 +304,16 @@
 }
 
 .upload-area h4 {
-  margin-bottom: var(--space-1);
+  margin-bottom: 0.15rem;
   color: var(--color-text-primary);
   font-weight: var(--font-weight-semibold);
-  font-size: 0.95rem;
+  font-size: 0.65rem;
 }
 
 .upload-area p {
   color: var(--color-text-secondary);
-  margin-bottom: var(--space-4);
-  font-size: 0.61rem;
+  margin-bottom: var(--space-2);
+  font-size: 0.5rem;
 }
 
 .upload-progress {
@@ -938,6 +938,12 @@
   gap: var(--space-1);
 }
 
+/* Smaller button for upload area */
+.upload-area .btn-small {
+  padding: 0.25rem var(--space-2);
+  font-size: 0.6rem;
+}
+
 .btn-icon {
   padding: var(--space-2);
   width: 32px;
@@ -995,16 +1001,16 @@
   border-radius: var(--radius-lg) 0 0 0;
 }
 
-/* Upload Section */
+/* Upload Section - Reduced by 80% total */
 .upload-section {
-  padding: var(--space-3);
+  padding: var(--space-1);
   border-bottom: 1px solid var(--color-border);
 }
 
 .upload-section .upload-area {
   border: 2px dashed var(--color-border);
   border-radius: var(--radius-md);
-  padding: var(--space-4) var(--space-3);
+  padding: var(--space-3) var(--space-2);
   text-align: center;
   transition: all var(--transition-base);
   background: var(--color-surface-elevated);
@@ -1022,49 +1028,83 @@
 }
 
 .upload-section .upload-icon {
-  font-size: 1.05rem;
-  margin-bottom: 0.35rem;
+  font-size: 0.9rem;
+  margin-bottom: 0.25rem;
 }
 
 .upload-section h4 {
-  margin: 0 0 0.15rem 0;
-  font-size: 0.63rem;
+  margin: 0 0 0.1rem 0;
+  font-size: 0.58rem;
   color: var(--color-text-primary);
 }
 
 .upload-section p {
-  margin: 0 0 0.7rem 0;
-  font-size: 0.56rem;
+  margin: 0 0 0.5rem 0;
+  font-size: 0.52rem;
   color: var(--color-text-secondary);
 }
 
-/* Sessions Section */
+/* Sessions Section - Further reduced to give more space to documents */
 .sessions-section {
-  flex: 1;
+  flex: 0.4;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   border-bottom: 1px solid var(--color-border);
 }
 
-/* Documents Section */
+/* Documents Section - Significantly increased height and better scrolling */
 .documents-section {
   padding: 0.7rem;
   border-bottom: 1px solid var(--color-border);
+  flex: 0.8;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .documents-section h4 {
   margin: 0 0 0.5rem 0;
   font-size: 0.63rem;
   color: var(--color-text-primary);
+  flex-shrink: 0;
 }
 
 .document-list {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  max-height: 105px;
+  flex: 1;
   overflow-y: auto;
+  padding-right: 0.4rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 102, 204, 0.3) rgba(0, 0, 0, 0.1);
+}
+
+/* Enhanced scrollbar for WebKit browsers */
+.document-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.document-list::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+  margin: 2px;
+}
+
+.document-list::-webkit-scrollbar-thumb {
+  background: rgba(0, 102, 204, 0.3);
+  border-radius: 4px;
+  border: 1px solid rgba(0, 102, 204, 0.1);
+}
+
+.document-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 102, 204, 0.5);
+  border-color: rgba(0, 102, 204, 0.2);
+}
+
+.document-list::-webkit-scrollbar-thumb:active {
+  background: var(--color-primary);
 }
 
 .document-item {
