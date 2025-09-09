@@ -23,13 +23,13 @@
         <div class="model-params-wrapper">
           <!-- First line: Temperature Control -->
           <div class="param-line">
-            <label class="param-label" title="Controls randomness of responses. 0 = deterministic, 1 = balanced, 2 = very random. Lower values (0.2-0.5) for focused tasks, higher values (0.7-1.5) for creative tasks.">
+            <label class="param-label" title="Controls randomness of responses. 0 = deterministic, 1 = very random. Lower values (0.1-0.3) for focused tasks, higher values (0.7-0.9) for creative tasks.">
               Temp:
               <div class="temp-control">
                 <input 
                   type="range" 
                   min="0" 
-                  max="2" 
+                  max="1" 
                   step="0.1" 
                   [(ngModel)]="temperature"
                   (change)="onTemperatureChange()"
@@ -37,7 +37,7 @@
                 <input 
                   type="number" 
                   min="0" 
-                  max="2" 
+                  max="1" 
                   step="0.1" 
                   [(ngModel)]="temperature"
                   (change)="onTemperatureChange()"

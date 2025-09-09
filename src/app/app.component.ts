@@ -79,7 +79,7 @@ export class AppComponent implements OnInit {
 
   onTemperatureChange() {
     // Ensure temperature stays within bounds
-    this.temperature = Math.max(0, Math.min(2, this.temperature));
+    this.temperature = Math.max(0, Math.min(1, this.temperature));
     this.globalModelSelection.updateModelParams({
       temperature: this.temperature,
       seed: this.seed
