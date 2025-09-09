@@ -24,6 +24,8 @@ export class AppComponent implements OnInit {
   loading = false;
   currentAppName = 'rag';
   showPrompts = false;
+  temperature: number = 1.0;
+  seed: number = -1;
 
   constructor(
     private authService: AuthService,
@@ -38,6 +40,12 @@ export class AppComponent implements OnInit {
     // Subscribe to current app changes
     this.globalModelSelection.currentApp$.subscribe(appName => {
       this.currentAppName = appName;
+    });
+
+    // Initialize temperature and seed in global service
+    this.globalModelSelection.updateModelParams({
+      temperature: this.temperature,
+      seed: this.seed
     });
   }
 
@@ -67,5 +75,28 @@ export class AppComponent implements OnInit {
 
   onShowPromptsToggle() {
     this.promptLogging.enableLogging(this.showPrompts);
+  }
+
+  onTemperatureChange() {
+    // Ensure temperature stays within bounds
+    this.temperature = Math.max(0, Math.min(2, this.temperature));
+    this.globalModelSelection.updateModelParams({
+      temperature: this.temperature,
+      seed: this.seed
+    });
+  }
+
+  onSeedChange() {
+    // Generate random 32-bit seed if -1, otherwise validate as positive integer
+    if (this.seed === -1) {
+      // Keep as -1 to indicate random seed
+    } else {
+      // Ensure seed is a valid 32-bit positive integer
+      this.seed = Math.max(-1, Math.min(2147483647, Math.floor(this.seed || -1)));
+    }
+    this.globalModelSelection.updateModelParams({
+      temperature: this.temperature,
+      seed: this.seed
+    });
   }
 }

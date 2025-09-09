@@ -6,6 +6,7 @@ import { DynamicModelSelection } from './models-config.service';
 import { McpService } from './mcp.service';
 import { McpRegistryService, McpToolCall } from './mcp-registry.service';
 import { PromptLoggingService } from './prompt-logging.service';
+import { GlobalModelSelectionService } from './global-model-selection.service';
 
 export interface ChatSession {
   id?: string;
@@ -70,7 +71,8 @@ export class ChatService {
     private auth: Auth,
     private mcpService: McpService,
     private mcpRegistry: McpRegistryService,
-    private promptLogging: PromptLoggingService
+    private promptLogging: PromptLoggingService,
+    private globalModelSelection: GlobalModelSelectionService
   ) { }
 
   async createSession(title?: string, associatedDocuments?: string[]): Promise<string> {
@@ -169,6 +171,13 @@ export class ChatService {
         });
       } else {
         console.log('Chat service: No model selection provided, using defaults');
+      }
+
+      // Add temperature and seed parameters
+      const modelParams = this.globalModelSelection.getModelParamsForRequest();
+      ragRequest.temperature = modelParams.temperature;
+      if (modelParams.seed !== -1) {
+        ragRequest.seed = modelParams.seed;
       }
 
       const { data } = await this.chatRag(ragRequest);
@@ -301,6 +310,13 @@ export class ChatService {
         console.log('Chat service: No model selection provided for general chat, using defaults');
       }
 
+      // Add temperature and seed parameters
+      const modelParams = this.globalModelSelection.getModelParamsForRequest();
+      generalRequest.temperature = modelParams.temperature;
+      if (modelParams.seed !== -1) {
+        generalRequest.seed = modelParams.seed;
+      }
+
       const { data } = await this.generalChat(generalRequest);
 
       // Generate a temporary message ID for general chat
@@ -381,6 +397,13 @@ export class ChatService {
         });
       } else {
         console.log('Chat service: No model selection provided for vision, using defaults');
+      }
+
+      // Add temperature and seed parameters
+      const modelParams = this.globalModelSelection.getModelParamsForRequest();
+      visionRequest.temperature = modelParams.temperature;
+      if (modelParams.seed !== -1) {
+        visionRequest.seed = modelParams.seed;
       }
 
       const { data } = await this.visionChat(visionRequest);
@@ -524,6 +547,13 @@ export class ChatService {
           isFollowUp: !!toolResults,
           toolCount: mcpRequest.tools?.length || 0
         });
+      }
+
+      // Add temperature and seed parameters
+      const modelParams = this.globalModelSelection.getModelParamsForRequest();
+      mcpRequest.temperature = modelParams.temperature;
+      if (modelParams.seed !== -1) {
+        mcpRequest.seed = modelParams.seed;
       }
 
       const { data } = await this.mcpChat(mcpRequest);

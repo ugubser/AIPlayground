@@ -340,6 +340,8 @@ export const chatRag = functions
       llmModel,
       embedProvider,
       embedModel,
+      temperature,
+      seed,
       enablePromptLogging = false
     } = data;
 
@@ -590,15 +592,20 @@ export const chatRag = functions
         throw new functions.https.HttpsError('internal', `No API URL configured for provider ${actualLlmProvider} and model type LLM`);
       }
 
-      const llmRequestBody = {
+      const llmRequestBody: any = {
         model: actualLlmModel,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        temperature: FUNCTION_CONSTANTS.LLM_CONFIG.RAG_TEMPERATURE,
+        temperature: temperature !== undefined ? temperature : FUNCTION_CONSTANTS.LLM_CONFIG.RAG_TEMPERATURE,
         max_tokens: FUNCTION_CONSTANTS.LLM_CONFIG.RAG_MAX_TOKENS
       };
+
+      // Add seed if provided (omit if -1 to let provider randomize)
+      if (seed !== undefined && seed !== -1) {
+        llmRequestBody.seed = seed;
+      }
 
       const llmHeaders = modelsConfigService.getProviderHeaders(actualLlmProvider, llmKey, 'rag');
 
@@ -727,7 +734,7 @@ export const generalChat = functions
       throw new functions.https.HttpsError('unauthenticated', 'Login required');
     }
 
-    const { message, llmProvider, llmModel, enablePromptLogging = false } = data;
+    const { message, llmProvider, llmModel, temperature, seed, enablePromptLogging = false } = data;
 
     // Use provided models from UI - these should always be provided by the frontend
     // Fallback to config defaults only if UI doesn't provide them
@@ -755,14 +762,19 @@ export const generalChat = functions
         throw new functions.https.HttpsError('internal', `No API URL configured for provider ${actualLlmProvider} and model type LLM`);
       }
 
-      const llmRequestBody = {
+      const llmRequestBody: any = {
         model: actualLlmModel,
         messages: [
           { role: 'user', content: message }
         ],
-        temperature: FUNCTION_CONSTANTS.LLM_CONFIG.CHAT_TEMPERATURE,
+        temperature: temperature !== undefined ? temperature : FUNCTION_CONSTANTS.LLM_CONFIG.CHAT_TEMPERATURE,
         max_tokens: FUNCTION_CONSTANTS.LLM_CONFIG.CHAT_MAX_TOKENS
       };
+
+      // Add seed if provided (omit if -1 to let provider randomize)
+      if (seed !== undefined && seed !== -1) {
+        llmRequestBody.seed = seed;
+      }
 
       const llmHeaders = modelsConfigService.getProviderHeaders(actualLlmProvider, llmKey, 'chat');
 
@@ -854,7 +866,7 @@ export const mcpChat = functions
       throw new functions.https.HttpsError('unauthenticated', 'Login required');
     }
 
-    const { message, llmProvider, llmModel, tools, toolResults, enablePromptLogging = false } = data;
+    const { message, llmProvider, llmModel, tools, toolResults, temperature, seed, enablePromptLogging = false } = data;
 
     // Use provided models from UI
     const defaults = modelsConfigService.getDefaultSelection('chat') as any;
@@ -920,9 +932,14 @@ export const mcpChat = functions
       const llmRequestBody: any = {
         model: actualLlmModel,
         messages: messages,
-        temperature: FUNCTION_CONSTANTS.LLM_CONFIG.CHAT_TEMPERATURE,
+        temperature: temperature !== undefined ? temperature : FUNCTION_CONSTANTS.LLM_CONFIG.CHAT_TEMPERATURE,
         max_tokens: FUNCTION_CONSTANTS.LLM_CONFIG.CHAT_MAX_TOKENS
       };
+
+      // Add seed if provided (omit if -1 to let provider randomize)
+      if (seed !== undefined && seed !== -1) {
+        llmRequestBody.seed = seed;
+      }
 
       // Add tools for supported providers (only on initial request)
       if (tools && tools.length > 0 && !toolResults) {
@@ -1074,7 +1091,7 @@ export const visionChat = functions
       throw new functions.https.HttpsError('unauthenticated', 'Login required');
     }
 
-    const { message, imageData, visionProvider, visionModel, enablePromptLogging = false } = data;
+    const { message, imageData, visionProvider, visionModel, temperature, seed, enablePromptLogging = false } = data;
 
     // Use provided models from UI - these should always be provided by the frontend
     // Fallback to config defaults only if UI doesn't provide them
@@ -1116,14 +1133,19 @@ export const visionChat = functions
         }
       ];
 
-      const visionRequestBody = {
+      const visionRequestBody: any = {
         model: actualVisionModel,
         messages: [
           { role: 'user', content: messageContent }
         ],
-        temperature: FUNCTION_CONSTANTS.LLM_CONFIG.VISION_TEMPERATURE,
+        temperature: temperature !== undefined ? temperature : FUNCTION_CONSTANTS.LLM_CONFIG.VISION_TEMPERATURE,
         max_tokens: FUNCTION_CONSTANTS.LLM_CONFIG.VISION_MAX_TOKENS
       };
+
+      // Add seed if provided (omit if -1 to let provider randomize)
+      if (seed !== undefined && seed !== -1) {
+        visionRequestBody.seed = seed;
+      }
 
       const visionHeaders = modelsConfigService.getProviderHeaders(actualVisionProvider, visionKey, 'vision');
 

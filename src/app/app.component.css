@@ -79,15 +79,125 @@
   gap: var(--space-4);
 }
 
-.show-prompts-wrapper {
+.model-params-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
   flex-shrink: 0;
 }
 
+.param-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.param-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+/* Temperature Controls */
+.temp-control {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.temp-slider {
+  width: 60px;
+  height: 20px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--color-gray-200);
+  border-radius: 10px;
+  outline: none;
+  opacity: 0.7;
+  transition: opacity var(--transition-fast);
+  cursor: pointer;
+}
+
+.temp-slider:hover {
+  opacity: 1;
+}
+
+.temp-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  cursor: pointer;
+  border: 2px solid var(--color-surface);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.temp-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  cursor: pointer;
+  border: 2px solid var(--color-surface);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.temp-input {
+  width: 50px;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: 0.75rem;
+  text-align: center;
+  transition: all var(--transition-fast);
+}
+
+.temp-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary);
+}
+
+/* Seed Control */
+.seed-input {
+  width: 80px;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: 0.75rem;
+  text-align: center;
+  transition: all var(--transition-fast);
+}
+
+.seed-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary);
+}
+
+.seed-input::placeholder {
+  color: var(--color-text-tertiary);
+  font-size: 0.7rem;
+}
+
+/* Show Prompts Checkbox */
 .show-prompts-checkbox {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   font-weight: var(--font-weight-medium);
   color: var(--color-text-secondary);
   cursor: pointer;
@@ -96,8 +206,8 @@
 
 .show-prompts-checkbox input[type="checkbox"] {
   appearance: none;
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   border: 2px solid var(--color-border);
   border-radius: 3px;
   background: var(--color-surface);
@@ -114,10 +224,10 @@
 .show-prompts-checkbox input[type="checkbox"]:checked::after {
   content: '✓';
   position: absolute;
-  top: -1px;
-  left: 2px;
+  top: -2px;
+  left: 1px;
   color: white;
-  font-size: 12px;
+  font-size: 10px;
   font-weight: bold;
 }
 
@@ -284,6 +394,29 @@
   .header-controls {
     order: 3;
     margin: 0;
+  }
+
+  .model-params-wrapper {
+    gap: var(--space-2);
+  }
+
+  .param-line {
+    flex-direction: column;
+    gap: var(--space-2);
+    align-items: stretch;
+  }
+
+  .param-label {
+    justify-content: space-between;
+  }
+
+  .temp-control {
+    flex: 1;
+    justify-content: flex-end;
+  }
+
+  .temp-slider {
+    width: 80px;
   }
   
   .model-config-wrapper {

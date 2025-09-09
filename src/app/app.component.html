@@ -20,15 +20,54 @@
       
       <!-- Global Model Configuration -->
       <div class="header-controls" *ngIf="user$ | async">
-        <div class="show-prompts-wrapper">
-          <label class="show-prompts-checkbox">
-            <input 
-              type="checkbox" 
-              [(ngModel)]="showPrompts"
-              (change)="onShowPromptsToggle()">
-            <span class="checkmark"></span>
-            Show Prompts
-          </label>
+        <div class="model-params-wrapper">
+          <!-- First line: Temperature Control -->
+          <div class="param-line">
+            <label class="param-label" title="Controls randomness of responses. 0 = deterministic, 1 = balanced, 2 = very random. Lower values (0.2-0.5) for focused tasks, higher values (0.7-1.5) for creative tasks.">
+              Temp:
+              <div class="temp-control">
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="2" 
+                  step="0.1" 
+                  [(ngModel)]="temperature"
+                  (change)="onTemperatureChange()"
+                  class="temp-slider">
+                <input 
+                  type="number" 
+                  min="0" 
+                  max="2" 
+                  step="0.1" 
+                  [(ngModel)]="temperature"
+                  (change)="onTemperatureChange()"
+                  class="temp-input">
+              </div>
+            </label>
+          </div>
+          
+          <!-- Second line: Seed Control -->
+          <div class="param-line">
+            <label class="param-label" title="Random seed for reproducible responses. Set to -1 for random seed, or any positive number for deterministic output. Same seed + same input = identical response.">
+              Seed:
+              <input 
+                type="number" 
+                [(ngModel)]="seed"
+                (change)="onSeedChange()"
+                placeholder="-1 (random)"
+                class="seed-input">
+            </label>
+            
+            <!-- Show Prompts on same line -->
+            <label class="show-prompts-checkbox">
+              <input 
+                type="checkbox" 
+                [(ngModel)]="showPrompts"
+                (change)="onShowPromptsToggle()">
+              <span class="checkmark"></span>
+              Show Prompts
+            </label>
+          </div>
         </div>
         <div class="model-config-wrapper">
           <app-dynamic-model-selector 

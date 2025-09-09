@@ -2,6 +2,11 @@ import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { ModelsConfigService, RAGModelSelection, DynamicModelSelection } from './models-config.service';
 
+export interface ModelParameters {
+  temperature: number;
+  seed: number;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -14,6 +19,9 @@ export class GlobalModelSelectionService {
   
   private mcpEnabledSubject = new BehaviorSubject<boolean>(false);
   public mcpEnabled$: Observable<boolean> = this.mcpEnabledSubject.asObservable();
+  
+  private modelParamsSubject = new BehaviorSubject<ModelParameters>({ temperature: 1.0, seed: -1 });
+  public modelParams$: Observable<ModelParameters> = this.modelParamsSubject.asObservable();
 
   constructor(private modelsConfig: ModelsConfigService) {
     // Initialize with default selection
@@ -127,5 +135,21 @@ export class GlobalModelSelectionService {
     }
     
     return Object.keys(selection).length > 0 ? selection : null;
+  }
+
+  updateModelParams(params: ModelParameters): void {
+    console.log('Global service updating model params to:', params);
+    this.modelParamsSubject.next(params);
+  }
+
+  getModelParams(): ModelParameters {
+    return this.modelParamsSubject.value;
+  }
+
+  // Convenience method for components to get model parameters for API requests
+  getModelParamsForRequest(): ModelParameters {
+    const params = this.getModelParams();
+    console.log('Getting model params for request:', params);
+    return params;
   }
 }
