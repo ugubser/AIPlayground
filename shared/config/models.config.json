@@ -1,4 +1,38 @@
 {
+  "providers": {
+    "openrouter.ai": {
+      "apiUrls": {
+        "LLM": "https://openrouter.ai/api/v1/chat/completions",
+        "VISION": "https://openrouter.ai/api/v1/chat/completions"
+      },
+      "apiKeyEnvVar": "OPENROUTER_API_KEY",
+      "capabilities": ["LLM", "VISION"]
+    },
+    "together.ai": {
+      "apiUrls": {
+        "LLM": "https://api.together.xyz/v1/chat/completions",
+        "EMBED": "https://api.together.xyz/v1/embeddings",
+        "VISION": "https://api.together.xyz/v1/chat/completions"
+      },
+      "apiKeyEnvVar": "TOGETHER_API_KEY",
+      "capabilities": ["LLM", "EMBED", "VISION"]
+    },
+    "ollama": {
+      "apiUrls": {
+        "LLM": "http://localhost:11434/api/v1/chat/completions",
+        "EMBED": "http://localhost:11434/api/embed"
+      },
+      "apiKeyEnvVar": "OLLAMA_API_KEY",
+      "capabilities": ["LLM", "EMBED"]
+    },
+    "publicai.co": {
+      "apiUrls": {
+        "LLM": "https://api.publicai.co/v1/chat/completions"
+      },
+      "apiKeyEnvVar": "PUBLICAI_API_KEY",
+      "capabilities": ["LLM"]
+    }
+  },
   "rag": {
     "LLM": {
       "openrouter.ai": [
@@ -66,6 +100,9 @@
         "deepseek-ai/DeepSeek-R1-Distill-Llama-70B-free",
         "lgai/exaone-deep-32b",
         "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
+      ],
+      "publicai.co": [
+        "swiss-ai/apertus-70b-instruct"
       ]
     },
     "MCP": {

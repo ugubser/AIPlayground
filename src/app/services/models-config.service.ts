@@ -2,6 +2,17 @@ import { Injectable } from '@angular/core';
 import modelsConfig from '../../../shared/config/models.config.json';
 import { getProviderApiUrl, getApiKeyEnvVar, supportsEmbeddings, getProviderHeaders } from '../utils/model-utils';
 
+export interface ProviderConfig {
+  apiUrls: { [modelType: string]: string };
+  apiKeyEnvVar: string;
+  capabilities: string[];
+}
+
+export interface ExtendedModelConfig {
+  providers: { [provider: string]: ProviderConfig };
+  [appName: string]: any;
+}
+
 export interface ModelConfig {
   [appName: string]: {
     [modelType: string]: {
@@ -28,9 +39,19 @@ export interface DynamicModelSelection {
   providedIn: 'root'
 })
 export class ModelsConfigService {
-  private config: ModelConfig = modelsConfig;
+  private fullConfig: ExtendedModelConfig = modelsConfig as any;
+  private config: ModelConfig;
 
-  constructor() { }
+  constructor() {
+    // Extract only the app-specific model configurations (skip providers section)
+    this.config = {};
+    for (const [key, value] of Object.entries(this.fullConfig)) {
+      if (key !== 'providers') {
+        this.config[key] = value;
+      }
+    }
+  }
+
 
   getApps(): string[] {
     return Object.keys(this.config);

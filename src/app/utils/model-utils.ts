@@ -1,4 +1,5 @@
 // Model utility functions
+import modelsConfig from '../../../shared/config/models.config.json';
 
 export interface ModelUrls {
   [provider: string]: {
@@ -10,32 +11,62 @@ export interface ApiKeyMapping {
   [provider: string]: string;
 }
 
-// Centralized API URLs configuration
-export const API_URLS: ModelUrls = {
-  'openrouter.ai': {
-    'LLM': 'https://openrouter.ai/api/v1/chat/completions',
-    'VISION': 'https://openrouter.ai/api/v1/chat/completions'
-  },
-  'together.ai': {
-    'LLM': 'https://api.together.xyz/v1/chat/completions',
-    'EMBED': 'https://api.together.xyz/v1/embeddings',
-    'VISION': 'https://api.together.xyz/v1/chat/completions'
-  },
-  'ollama': {
-    'LLM': 'http://localhost:11434/api/v1/chat/completions',
-    'EMBED': 'http://localhost:11434/api/embed'
+// Dynamic API URLs loaded from config
+function loadApiUrls(): ModelUrls {
+  const urls: ModelUrls = {};
+  const config = modelsConfig as any;
+  
+  if (config.providers) {
+    for (const [provider, providerConfig] of Object.entries(config.providers)) {
+      const providerData = providerConfig as any;
+      if (providerData.apiUrls) {
+        urls[provider] = providerData.apiUrls;
+      }
+    }
   }
-};
+  
+  return urls;
+}
 
-// Centralized API key environment variable mapping
-export const API_KEY_ENV_VARS: ApiKeyMapping = {
-  'together.ai': 'TOGETHER_API_KEY',
-  'openrouter.ai': 'OPENROUTER_API_KEY',
-  'ollama': 'OLLAMA_API_KEY'
-};
+export const API_URLS: ModelUrls = loadApiUrls();
 
-// Providers that support embeddings
-export const EMBEDDING_PROVIDERS = ['together.ai', 'ollama'];
+// Dynamic API key mappings loaded from config
+function loadApiKeyMappings(): ApiKeyMapping {
+  const mappings: ApiKeyMapping = {};
+  const config = modelsConfig as any;
+  
+  if (config.providers) {
+    for (const [provider, providerConfig] of Object.entries(config.providers)) {
+      const providerData = providerConfig as any;
+      if (providerData.apiKeyEnvVar) {
+        mappings[provider] = providerData.apiKeyEnvVar;
+      }
+    }
+  }
+  
+  return mappings;
+}
+
+export const API_KEY_ENV_VARS: ApiKeyMapping = loadApiKeyMappings();
+
+// Dynamic embedding providers loaded from config
+function loadEmbeddingProviders(): string[] {
+  const providers: string[] = [];
+  const config = modelsConfig as any;
+  
+  if (config.providers) {
+    for (const [provider, providerConfig] of Object.entries(config.providers)) {
+      const providerData = providerConfig as any;
+      if (providerData.capabilities && providerData.capabilities.includes('EMBED')) {
+        providers.push(provider);
+      }
+    }
+  }
+  
+  return providers;
+}
+
+export const EMBEDDING_PROVIDERS = loadEmbeddingProviders();
 
 // App info for headers
 export const APP_INFO = {
