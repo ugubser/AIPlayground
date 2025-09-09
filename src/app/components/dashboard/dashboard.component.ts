@@ -545,7 +545,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
           this.generalMessages.push({
             id: firstMessageId,
             role: 'assistant',
-            content: `🤔 **Thinking:** ${mcpResponse.answer}`,
+            content: this.formatThinkingContent(mcpResponse.answer),
             createdAt: new Date()
           });
           
@@ -589,7 +589,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.generalMessages.push({
           id: finalMessageId,
           role: 'assistant',
-          content: `✅ **Answer:** ${finalResponse.answer}`,
+          content: this.formatAnswerContent(finalResponse.answer),
           createdAt: new Date()
         });
         
@@ -1013,6 +1013,51 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   trackByPromptId(index: number, item: PromptLogEntry): string {
     return item.id;
+  }
+
+  /**
+   * Formats content to ensure proper markdown rendering by adding a newline
+   * before markdown content when it starts with markdown syntax
+   */
+  private formatAnswerContent(answer: string): string {
+    return this.formatPrefixedContent('✅ **Answer:**', answer);
+  }
+
+  /**
+   * Formats content to ensure proper markdown rendering by adding a newline
+   * before markdown content when it starts with markdown syntax
+   */
+  private formatThinkingContent(answer: string): string {
+    return this.formatPrefixedContent('🤔 **Thinking:**', answer);
+  }
+
+  /**
+   * Generic formatter for prefixed content with markdown detection
+   */
+  private formatPrefixedContent(prefix: string, content: string): string {
+    // Common markdown patterns that should start on a new line
+    const markdownPatterns = [
+      /^#{1,6}\s/, // Headers (# ## ### etc.)
+      /^-\s/, // Unordered lists
+      /^\*\s/, // Unordered lists (asterisk)
+      /^\+\s/, // Unordered lists (plus)
+      /^\d+\.\s/, // Ordered lists
+      /^>\s/, // Blockquotes
+      /^```/, // Code blocks
+      /^`/, // Inline code at start
+      /^\|.*\|/, // Tables
+      /^---/, // Horizontal rules
+      /^\*\*/, // Bold at start
+      /^_/, // Italic/underscore at start
+    ];
+
+    const startsWithMarkdown = markdownPatterns.some(pattern => pattern.test(content.trim()));
+    
+    if (startsWithMarkdown) {
+      return `${prefix}\n\n${content}`;
+    } else {
+      return `${prefix} ${content}`;
+    }
   }
 
   ngOnDestroy() {
