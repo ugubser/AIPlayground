@@ -59,6 +59,9 @@
         "deepseek-ai/DeepSeek-R1-Distill-Llama-70B-free",
         "lgai/exaone-deep-32b",
         "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
+      ],
+      "publicai.co": [
+        "swiss-ai/apertus-70b-instruct"
       ]
     },
     "EMBED": {
