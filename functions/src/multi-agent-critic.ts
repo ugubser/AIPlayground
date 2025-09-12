@@ -19,6 +19,9 @@ interface CriticRequest {
   };
   taskResults?: any[];
   modelSelection?: any;
+  temperature?: number;
+  seed?: number;
+  enablePromptLogging?: boolean;
 }
 
 interface CriticResponse {
@@ -30,6 +33,10 @@ interface CriticResponse {
     completeness: number;
   };
   improvements?: string[];
+  promptData?: {
+    llmRequest?: any;
+    llmResponse?: any;
+  };
 }
 
 export const multiAgentCritic = onRequest(
@@ -58,7 +65,7 @@ export const multiAgentCritic = onRequest(
         return;
       }
 
-      const { originalQuery, verification, taskResults, modelSelection }: CriticRequest = req.body;
+      const { originalQuery, verification, taskResults, modelSelection, temperature, seed, enablePromptLogging = false }: CriticRequest = req.body;
 
       if (!originalQuery || !verification) {
         logger.warn('Missing required fields for critic', { 
@@ -110,7 +117,7 @@ export const multiAgentCritic = onRequest(
           role: 'user',
           content: criticPrompt
         }
-      ], actualModel);
+      ], actualModel, temperature, seed);
 
       logger.info('LLM critic response received', { 
         responseLength: llmResponse.length 
@@ -122,6 +129,42 @@ export const multiAgentCritic = onRequest(
 
       // Parse and format the final response
       const criticResponse = parseCriticResponse(llmResponse, verification);
+
+      // Add prompt data if logging is enabled
+      if (enablePromptLogging) {
+        const requestBody: any = {
+          model: actualModel,
+          messages: [
+            {
+              role: 'system',
+              content: CRITIC_SYSTEM_PROMPT
+            },
+            {
+              role: 'user',
+              content: criticPrompt
+            }
+          ],
+          temperature: temperature !== undefined ? temperature : 0.7,
+          max_tokens: 4000
+        };
+
+        if (seed !== undefined && seed !== -1) {
+          requestBody.seed = seed;
+        }
+
+        criticResponse.promptData = {
+          llmRequest: {
+            provider: 'openrouter.ai',
+            model: actualModel,
+            content: JSON.stringify(requestBody, null, 2)
+          },
+          llmResponse: {
+            provider: 'openrouter.ai',
+            model: actualModel,
+            content: llmResponse
+          }
+        };
+      }
 
       logger.info('Final response created', { 
         answerLength: criticResponse.finalAnswer.length,

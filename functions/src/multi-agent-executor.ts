@@ -15,6 +15,10 @@ interface ExecutorRequest {
     dependencyResults: Record<string, any>;
   };
   modelSelection?: any;
+  temperature?: number;
+  seed?: number;
+  enablePromptLogging?: boolean;
+  preFilteredTools?: any[]; // Pre-filtered tools to avoid redundant server calls
 }
 
 interface ExecutorResponse {
@@ -23,6 +27,10 @@ interface ExecutorResponse {
   reasoning: string;
   toolCalls: any[];
   success: boolean;
+  promptData?: {
+    llmRequest?: any;
+    llmResponse?: any;
+  };
 }
 
 export const multiAgentExecutor = onRequest(
@@ -51,7 +59,7 @@ export const multiAgentExecutor = onRequest(
         return;
       }
 
-      const { task, modelSelection }: ExecutorRequest = req.body;
+      const { task, modelSelection, temperature, seed, enablePromptLogging = false, preFilteredTools }: ExecutorRequest = req.body;
 
       if (!task || !task.id || !task.description) {
         logger.warn('Missing required task fields', { 
@@ -79,7 +87,9 @@ export const multiAgentExecutor = onRequest(
         description: task.description.substring(0, 100) + '...',
         toolCount: task.tools?.length || 0,
         dependencyCount: Object.keys(task.dependencyResults || {}).length,
-        model: actualModel
+        model: actualModel,
+        temperature: temperature,
+        seed: seed
       });
 
       if (isEmulator) {
@@ -88,7 +98,9 @@ export const multiAgentExecutor = onRequest(
           description: task.description,
           tools: task.tools,
           dependencyResults: task.dependencyResults,
-          model: actualModel
+          model: actualModel,
+          temperature: temperature,
+          seed: seed
         }, null, 2));
       }
 
@@ -99,22 +111,33 @@ export const multiAgentExecutor = onRequest(
         console.log('📝 Executor Prompt:', executionPrompt.substring(0, 1500) + '...');
       }
 
-      // Get available tools for this task
-      const availableTools = await getAvailableToolsForTask(task.tools);
-
-      logger.info('Tools available for task', { 
-        taskId: task.id,
-        requestedTools: task.tools,
-        availableToolsCount: availableTools.length
-      });
+      // Use pre-filtered tools if provided, otherwise get available tools for this task
+      let availableTools: any[];
+      if (preFilteredTools && preFilteredTools.length > 0) {
+        availableTools = preFilteredTools;
+        logger.info('Using pre-filtered tools', { 
+          taskId: task.id,
+          requestedTools: task.tools,
+          preFilteredCount: availableTools.length
+        });
+      } else {
+        // Fallback to old method if pre-filtered tools not provided
+        availableTools = await getAvailableToolsForTask(task.tools);
+        logger.info('Tools available for task (fallback)', { 
+          taskId: task.id,
+          requestedTools: task.tools,
+          availableToolsCount: availableTools.length
+        });
+      }
 
       if (isEmulator) {
         console.log('🔧 Available Tools for Task:', JSON.stringify({
           taskId: task.id,
           requestedTools: task.tools,
+          usingPreFiltered: !!(preFilteredTools && preFilteredTools.length > 0),
           availableTools: availableTools.map(t => ({
-            name: t.function.name,
-            description: t.function.description.substring(0, 100) + '...'
+            name: t.function?.name || t.name,
+            description: (t.function?.description || t.description)?.substring(0, 100) + '...'
           }))
         }, null, 2));
       }
@@ -138,7 +161,7 @@ export const multiAgentExecutor = onRequest(
             role: 'user',
             content: executionPrompt
           }
-        ], actualModel, availableTools, task.id);
+        ], actualModel, availableTools, task.id, temperature, seed);
 
         result = toolResponse.content;
         toolCalls = toolResponse.toolCalls || [];
@@ -174,7 +197,7 @@ export const multiAgentExecutor = onRequest(
             role: 'user',
             content: executionPrompt
           }
-        ], actualModel);
+        ], actualModel, temperature, seed);
 
         if (isEmulator) {
           console.log('💭 Reasoning Result:', result.substring(0, 500) + '...');
@@ -188,6 +211,52 @@ export const multiAgentExecutor = onRequest(
         toolCalls,
         success: true
       };
+
+      // Add prompt data if logging is enabled
+      if (enablePromptLogging) {
+        const messages = [
+          {
+            role: 'system',
+            content: availableTools.length > 0 ? EXECUTOR_SYSTEM_PROMPT : EXECUTOR_SYSTEM_PROMPT_NO_TOOLS
+          },
+          {
+            role: 'user',
+            content: executionPrompt
+          }
+        ];
+
+        const requestBody: any = {
+          model: actualModel,
+          messages: messages,
+          temperature: temperature !== undefined ? temperature : 0.7,
+          max_tokens: 4000
+        };
+
+        if (seed !== undefined && seed !== -1) {
+          requestBody.seed = seed;
+        }
+
+        if (availableTools.length > 0) {
+          requestBody.tools = availableTools;
+          requestBody.tool_choice = 'auto';
+        }
+
+        executorResponse.promptData = {
+          llmRequest: {
+            provider: 'openrouter.ai',
+            model: actualModel,
+            content: JSON.stringify(requestBody, null, 2)
+          },
+          llmResponse: {
+            provider: 'openrouter.ai',
+            model: actualModel,
+            content: JSON.stringify({
+              result: result,
+              toolCalls: toolCalls
+            }, null, 2)
+          }
+        };
+      }
 
       logger.info('Task execution completed', { 
         taskId: task.id,

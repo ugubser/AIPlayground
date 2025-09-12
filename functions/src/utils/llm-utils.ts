@@ -47,7 +47,8 @@ const isEmulator = process.env.FUNCTIONS_EMULATOR === 'true';
 export async function getLLMResponse(
   messages: ChatMessage[], 
   model?: string,
-  temperature?: number
+  temperature?: number,
+  seed?: number
 ): Promise<string> {
   
   const actualLlmModel = model || 'meta-llama/llama-4-maverick:free';
@@ -82,9 +83,14 @@ export async function getLLMResponse(
   const llmRequestBody: any = {
     model: actualLlmModel,
     messages,
-    temperature: temperature || 0.7,
+    temperature: temperature !== undefined ? temperature : 0.7,
     max_tokens: 4000
   };
+
+  // Add seed if provided (omit if -1 or undefined to let provider randomize)
+  if (seed !== undefined && seed !== -1) {
+    llmRequestBody.seed = seed;
+  }
 
   logger.info('LLM Request', { 
     provider: actualLlmProvider, 
@@ -98,7 +104,8 @@ export async function getLLMResponse(
       model: actualLlmModel,
       url: llmApiUrl,
       messageCount: messages.length,
-      temperature: temperature || 0.7,
+      temperature: llmRequestBody.temperature,
+      seed: llmRequestBody.seed,
       messages: messages.map(m => ({
         role: m.role,
         contentLength: m.content.length
@@ -144,7 +151,9 @@ export async function getLLMResponseWithTools(
   messages: ChatMessage[], 
   model?: string,
   tools?: any[],
-  taskId?: string
+  taskId?: string,
+  temperature?: number,
+  seed?: number
 ): Promise<ToolCallResponse> {
   
   const actualLlmModel = model || 'meta-llama/llama-4-maverick:free';
@@ -178,9 +187,14 @@ export async function getLLMResponseWithTools(
   const llmRequestBody: any = {
     model: actualLlmModel,
     messages,
-    temperature: 0.7,
+    temperature: temperature !== undefined ? temperature : 0.7,
     max_tokens: 4000
   };
+
+  // Add seed if provided (omit if -1 or undefined to let provider randomize)
+  if (seed !== undefined && seed !== -1) {
+    llmRequestBody.seed = seed;
+  }
 
   // Add tools if provided
   if (tools && tools.length > 0) {
@@ -202,6 +216,8 @@ export async function getLLMResponseWithTools(
       model: actualLlmModel,
       url: llmApiUrl,
       messageCount: messages.length,
+      temperature: llmRequestBody.temperature,
+      seed: llmRequestBody.seed,
       toolCount: tools?.length || 0,
       hasTools: !!(tools && tools.length > 0),
       taskId,

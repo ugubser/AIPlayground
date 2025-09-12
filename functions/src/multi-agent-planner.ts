@@ -16,6 +16,9 @@ interface PlannerRequest {
     inputSchema: any;
   }[];
   modelSelection?: any;
+  temperature?: number;
+  seed?: number;
+  enablePromptLogging?: boolean;
 }
 
 interface Task {
@@ -30,6 +33,10 @@ interface PlannerResponse {
   tasks: Task[];
   totalSteps: number;
   reasoning: string;
+  promptData?: {
+    llmRequest?: any;
+    llmResponse?: any;
+  };
 }
 
 export const multiAgentPlanner = onRequest(
@@ -58,7 +65,7 @@ export const multiAgentPlanner = onRequest(
         return;
       }
 
-      const { query, availableTools, modelSelection }: PlannerRequest = req.body;
+      const { query, availableTools, modelSelection, temperature, seed, enablePromptLogging = false }: PlannerRequest = req.body;
 
       if (!query || !availableTools) {
         logger.warn('Missing required fields', { query: !!query, availableTools: !!availableTools });
@@ -113,7 +120,7 @@ export const multiAgentPlanner = onRequest(
           role: 'user',
           content: planningPrompt
         }
-      ], actualModel);
+      ], actualModel, temperature, seed);
 
       logger.info('LLM planning response received', { 
         responseLength: llmResponse.length 
@@ -141,6 +148,42 @@ export const multiAgentPlanner = onRequest(
 
       // Validate the plan
       validatePlan(plannerResponse);
+
+      // Add prompt data if logging is enabled
+      if (enablePromptLogging) {
+        const requestBody: any = {
+          model: actualModel,
+          messages: [
+            {
+              role: 'system',
+              content: PLANNER_SYSTEM_PROMPT
+            },
+            {
+              role: 'user', 
+              content: planningPrompt
+            }
+          ],
+          temperature: temperature !== undefined ? temperature : 0.7,
+          max_tokens: 4000
+        };
+
+        if (seed !== undefined && seed !== -1) {
+          requestBody.seed = seed;
+        }
+
+        plannerResponse.promptData = {
+          llmRequest: {
+            provider: 'openrouter.ai',
+            model: actualModel,
+            content: JSON.stringify(requestBody, null, 2)
+          },
+          llmResponse: {
+            provider: 'openrouter.ai',
+            model: actualModel,
+            content: llmResponse
+          }
+        };
+      }
 
       logger.info('Plan created successfully', { 
         taskCount: plannerResponse.tasks.length,

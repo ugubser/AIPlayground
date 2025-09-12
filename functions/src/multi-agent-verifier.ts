@@ -15,6 +15,9 @@ interface VerifierRequest {
     result: any;
   }[];
   modelSelection?: any;
+  temperature?: number;
+  seed?: number;
+  enablePromptLogging?: boolean;
 }
 
 interface TaskVerification {
@@ -32,6 +35,10 @@ interface VerifierResponse {
   finalAnswer: string;
   reasoning: string;
   recommendations?: string[];
+  promptData?: {
+    llmRequest?: any;
+    llmResponse?: any;
+  };
 }
 
 export const multiAgentVerifier = onRequest(
@@ -60,7 +67,7 @@ export const multiAgentVerifier = onRequest(
         return;
       }
 
-      const { originalQuery, tasks, modelSelection }: VerifierRequest = req.body;
+      const { originalQuery, tasks, modelSelection, temperature, seed, enablePromptLogging = false }: VerifierRequest = req.body;
 
       if (!originalQuery || !tasks || !Array.isArray(tasks)) {
         logger.warn('Missing required fields for verification', { 
@@ -116,7 +123,7 @@ export const multiAgentVerifier = onRequest(
           role: 'user',
           content: verificationPrompt
         }
-      ], actualModel);
+      ], actualModel, temperature, seed);
 
       logger.info('LLM verification response received', { 
         responseLength: llmResponse.length 
@@ -128,6 +135,42 @@ export const multiAgentVerifier = onRequest(
 
       // Parse the structured response
       const verifierResponse = parseVerifierResponse(llmResponse, originalQuery, tasks);
+
+      // Add prompt data if logging is enabled
+      if (enablePromptLogging) {
+        const requestBody: any = {
+          model: actualModel,
+          messages: [
+            {
+              role: 'system',
+              content: VERIFIER_SYSTEM_PROMPT
+            },
+            {
+              role: 'user',
+              content: verificationPrompt
+            }
+          ],
+          temperature: temperature !== undefined ? temperature : 0.7,
+          max_tokens: 4000
+        };
+
+        if (seed !== undefined && seed !== -1) {
+          requestBody.seed = seed;
+        }
+
+        verifierResponse.promptData = {
+          llmRequest: {
+            provider: 'openrouter.ai',
+            model: actualModel,
+            content: JSON.stringify(requestBody, null, 2)
+          },
+          llmResponse: {
+            provider: 'openrouter.ai',
+            model: actualModel,
+            content: llmResponse
+          }
+        };
+      }
 
       logger.info('Verification completed', { 
         overallCorrect: verifierResponse.overallCorrect,

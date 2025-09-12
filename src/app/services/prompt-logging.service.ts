@@ -9,8 +9,9 @@ export interface PromptLogEntry {
   timestamp: Date;
   content: string;
   expanded: boolean;
-  sessionContext?: 'rag' | 'general' | 'vision' | 'mcp';
+  sessionContext?: 'rag' | 'general' | 'vision' | 'mcp' | 'multi-agent-planner' | 'multi-agent-verifier' | 'multi-agent-critic' | string;
   messageId?: string;
+  metadata?: Record<string, any>;
 }
 
 @Injectable({

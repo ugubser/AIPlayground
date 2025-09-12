@@ -30,6 +30,15 @@ export interface MultiAgentResponse {
   success: boolean;
 }
 
+export interface MultiAgentRequest {
+  query: string;
+  sessionId?: string;
+  modelSelection?: any;
+  temperature?: number;
+  seed?: number;
+  enablePromptLogging?: boolean;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -50,23 +59,38 @@ export class MultiAgentOrchestratorService {
     sessionId?: string,
     modelSelection?: any
   ): Promise<MultiAgentResponse> {
-    this.logger.startExecution(query);
+    return this.processQueryWithParams({
+      query,
+      sessionId,
+      modelSelection
+    });
+  }
+
+  async processQueryWithParams(request: MultiAgentRequest): Promise<MultiAgentResponse> {
+    this.logger.startExecution(request.query);
+    
+    console.log('🤖 Multi-Agent Request Parameters:', {
+      temperature: request.temperature,
+      seed: request.seed,
+      enablePromptLogging: request.enablePromptLogging,
+      modelSelection: request.modelSelection
+    });
     
     try {
       // Phase 1: Planning
-      const plan = await this.planningPhase(query, modelSelection);
+      const plan = await this.planningPhase(request.query, request.modelSelection, request.temperature, request.seed, request.enablePromptLogging);
       this.logger.logPhase('planning', { taskCount: plan.tasks.length });
       
       // Phase 2: Execution with dependency management
-      const executedTasks = await this.executionPhase(plan, modelSelection);
+      const executedTasks = await this.executionPhase(plan, request.modelSelection, request.temperature, request.seed, request.enablePromptLogging);
       this.logger.logPhase('execution', { completedTasks: executedTasks.filter(t => t.status === 'completed').length });
       
       // Phase 3: Verification
-      const verification = await this.verificationPhase(executedTasks, query, modelSelection);
+      const verification = await this.verificationPhase(executedTasks, request.query, request.modelSelection, request.temperature, request.seed, request.enablePromptLogging);
       this.logger.logPhase('verification', verification);
       
       // Phase 4: Final formatting
-      const finalAnswer = await this.criticPhase(verification, query, modelSelection);
+      const finalAnswer = await this.criticPhase(verification, request.query, request.modelSelection, request.temperature, request.seed, request.enablePromptLogging);
       this.logger.logPhase('critic', { answerLength: finalAnswer.length });
       
       const response: MultiAgentResponse = {
@@ -90,7 +114,7 @@ export class MultiAgentOrchestratorService {
     }
   }
 
-  private async planningPhase(query: string, modelSelection?: any): Promise<ExecutionPlan> {
+  private async planningPhase(query: string, modelSelection?: any, temperature?: number, seed?: number, enablePromptLogging?: boolean): Promise<ExecutionPlan> {
     const availableTools = this.mcpRegistry.getAvailableTools();
     
     const plannerRequest = {
@@ -101,8 +125,10 @@ export class MultiAgentOrchestratorService {
         serverId: tool.serverId,
         inputSchema: tool.inputSchema
       })),
-      enablePromptLogging: this.promptLogging.isLoggingActive(),
-      modelSelection: modelSelection
+      enablePromptLogging: enablePromptLogging !== undefined ? enablePromptLogging : this.promptLogging.isLoggingActive(),
+      modelSelection: modelSelection,
+      temperature: temperature,
+      seed: seed
     };
 
     // Log to prompt logging if enabled
@@ -126,6 +152,35 @@ export class MultiAgentOrchestratorService {
 
     const plannerResponse = await response.json();
     
+    // Log prompt data if available and enabled
+    if (plannerResponse.promptData && (enablePromptLogging !== undefined ? enablePromptLogging : this.promptLogging.isLoggingActive())) {
+      const messageId = `multiagent_planner_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+      
+      if (plannerResponse.promptData.llmRequest) {
+        this.promptLogging.addPromptLog({
+          type: 'request',
+          provider: plannerResponse.promptData.llmRequest.provider,
+          model: plannerResponse.promptData.llmRequest.model,
+          content: plannerResponse.promptData.llmRequest.content,
+          timestamp: new Date(),
+          sessionContext: 'multi-agent-planner',
+          messageId: messageId
+        });
+      }
+      
+      if (plannerResponse.promptData.llmResponse) {
+        this.promptLogging.addPromptLog({
+          type: 'response',
+          provider: plannerResponse.promptData.llmResponse.provider,
+          model: plannerResponse.promptData.llmResponse.model,
+          content: plannerResponse.promptData.llmResponse.content,
+          timestamp: new Date(),
+          sessionContext: 'multi-agent-planner',
+          messageId: messageId
+        });
+      }
+    }
+    
     // Convert planner response to execution plan
     const tasks: Task[] = plannerResponse.tasks.map((task: any, index: number) => ({
       id: task.id || `task_${index}`,
@@ -143,12 +198,19 @@ export class MultiAgentOrchestratorService {
     return orderedPlan;
   }
 
-  private async executionPhase(plan: ExecutionPlan, modelSelection?: any): Promise<Task[]> {
+  private async executionPhase(plan: ExecutionPlan, modelSelection?: any, temperature?: number, seed?: number, enablePromptLogging?: boolean): Promise<Task[]> {
     const allTasks = [...plan.tasks];
+    
+    // Get all available tools once at the beginning to avoid redundant calls
+    const availableTools = this.mcpRegistry.getAvailableTools();
+    console.log('🔧 Cached tools for execution phase:', {
+      totalTools: availableTools.length,
+      toolNames: availableTools.map(t => t.name)
+    });
     
     // Execute tasks in parallel groups based on dependencies
     for (const parallelGroup of plan.parallelGroups) {
-      const executionPromises = parallelGroup.map(task => this.executeTask(task, modelSelection));
+      const executionPromises = parallelGroup.map(task => this.executeTask(task, modelSelection, temperature, seed, enablePromptLogging, availableTools));
       const results = await Promise.allSettled(executionPromises);
       
       // Update task statuses based on results
@@ -180,13 +242,34 @@ export class MultiAgentOrchestratorService {
     return allTasks;
   }
 
-  private async executeTask(task: Task, modelSelection?: any): Promise<any> {
+  private async executeTask(task: Task, modelSelection?: any, temperature?: number, seed?: number, enablePromptLogging?: boolean, availableTools?: any[]): Promise<any> {
     this.logger.logTaskStart(task);
     task.status = 'executing';
     
     try {
       // Get results from dependent tasks
       const dependencyResults = this.taskManager.getDependencyResults(task.id);
+      
+      // Filter available tools to only those needed for this task
+      const filteredMcpTools = availableTools ? availableTools.filter(tool => 
+        task.tools.includes(tool.name)
+      ) : [];
+      
+      // Convert MCP tools to OpenAI tool format expected by LLM utils
+      const taskTools = filteredMcpTools.map(mcpTool => ({
+        type: 'function',
+        function: {
+          name: mcpTool.name,
+          description: mcpTool.description,
+          parameters: mcpTool.inputSchema
+        }
+      }));
+      
+      console.log(`🔧 Tools for task ${task.id}:`, {
+        requested: task.tools,
+        available: taskTools.map(t => t.function.name),
+        filtered: taskTools.length
+      });
       
       const executorRequest = {
         task: {
@@ -195,8 +278,11 @@ export class MultiAgentOrchestratorService {
           tools: task.tools,
           dependencyResults
         },
-        enablePromptLogging: this.promptLogging.isLoggingActive(),
-        modelSelection: modelSelection
+        enablePromptLogging: enablePromptLogging !== undefined ? enablePromptLogging : this.promptLogging.isLoggingActive(),
+        modelSelection: modelSelection,
+        temperature: temperature,
+        seed: seed,
+        preFilteredTools: taskTools // Pass pre-filtered tools to avoid server calls
       };
 
       // Log to prompt logging if enabled
@@ -221,6 +307,35 @@ export class MultiAgentOrchestratorService {
       const result = await response.json();
       this.logger.logTaskComplete(task, result);
       
+      // Log prompt data if available and enabled
+      if (result.promptData && (enablePromptLogging !== undefined ? enablePromptLogging : this.promptLogging.isLoggingActive())) {
+        const messageId = `multiagent_executor_${task.id}_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+        
+        if (result.promptData.llmRequest) {
+          this.promptLogging.addPromptLog({
+            type: 'request',
+            provider: result.promptData.llmRequest.provider,
+            model: result.promptData.llmRequest.model,
+            content: result.promptData.llmRequest.content,
+            timestamp: new Date(),
+            sessionContext: `multi-agent-executor-${task.id}`,
+            messageId: messageId
+          });
+        }
+        
+        if (result.promptData.llmResponse) {
+          this.promptLogging.addPromptLog({
+            type: 'response',
+            provider: result.promptData.llmResponse.provider,
+            model: result.promptData.llmResponse.model,
+            content: result.promptData.llmResponse.content,
+            timestamp: new Date(),
+            sessionContext: `multi-agent-executor-${task.id}`,
+            messageId: messageId
+          });
+        }
+      }
+      
       // Store result for dependent tasks
       this.taskManager.setTaskResult(task.id, result);
       
@@ -232,7 +347,7 @@ export class MultiAgentOrchestratorService {
     }
   }
 
-  private async verificationPhase(tasks: Task[], originalQuery: string, modelSelection?: any): Promise<any> {
+  private async verificationPhase(tasks: Task[], originalQuery: string, modelSelection?: any, temperature?: number, seed?: number, enablePromptLogging?: boolean): Promise<any> {
     const completedTasks = tasks.filter(t => t.status === 'completed');
     
     const verifierRequest = {
@@ -242,8 +357,10 @@ export class MultiAgentOrchestratorService {
         description: t.description,
         result: t.result
       })),
-      enablePromptLogging: this.promptLogging.isLoggingActive(),
-      modelSelection: modelSelection
+      enablePromptLogging: enablePromptLogging !== undefined ? enablePromptLogging : this.promptLogging.isLoggingActive(),
+      modelSelection: modelSelection,
+      temperature: temperature,
+      seed: seed
     };
 
     // Log to prompt logging if enabled
@@ -265,16 +382,49 @@ export class MultiAgentOrchestratorService {
       throw new Error(`Verifier failed: ${response.statusText}`);
     }
 
-    return await response.json();
+    const verificationResult = await response.json();
+    
+    // Log prompt data if available and enabled
+    if (verificationResult.promptData && (enablePromptLogging !== undefined ? enablePromptLogging : this.promptLogging.isLoggingActive())) {
+      const messageId = `multiagent_verifier_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+      
+      if (verificationResult.promptData.llmRequest) {
+        this.promptLogging.addPromptLog({
+          type: 'request',
+          provider: verificationResult.promptData.llmRequest.provider,
+          model: verificationResult.promptData.llmRequest.model,
+          content: verificationResult.promptData.llmRequest.content,
+          timestamp: new Date(),
+          sessionContext: 'multi-agent-verifier',
+          messageId: messageId
+        });
+      }
+      
+      if (verificationResult.promptData.llmResponse) {
+        this.promptLogging.addPromptLog({
+          type: 'response',
+          provider: verificationResult.promptData.llmResponse.provider,
+          model: verificationResult.promptData.llmResponse.model,
+          content: verificationResult.promptData.llmResponse.content,
+          timestamp: new Date(),
+          sessionContext: 'multi-agent-verifier',
+          messageId: messageId
+        });
+      }
+    }
+    
+    return verificationResult;
   }
 
-  private async criticPhase(verification: any, originalQuery: string, modelSelection?: any): Promise<string> {
+  private async criticPhase(verification: any, originalQuery: string, modelSelection?: any, temperature?: number, seed?: number, enablePromptLogging?: boolean): Promise<string> {
     const criticRequest = {
       originalQuery,
       verification,
       taskResults: verification.taskResults || [],
-      enablePromptLogging: this.promptLogging.isLoggingActive(),
-      modelSelection: modelSelection
+      enablePromptLogging: enablePromptLogging !== undefined ? enablePromptLogging : this.promptLogging.isLoggingActive(),
+      modelSelection: modelSelection,
+      temperature: temperature,
+      seed: seed
     };
 
     // Log to prompt logging if enabled
@@ -297,6 +447,36 @@ export class MultiAgentOrchestratorService {
     }
 
     const result = await response.json();
+    
+    // Log prompt data if available and enabled
+    if (result.promptData && (enablePromptLogging !== undefined ? enablePromptLogging : this.promptLogging.isLoggingActive())) {
+      const messageId = `multiagent_critic_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+      
+      if (result.promptData.llmRequest) {
+        this.promptLogging.addPromptLog({
+          type: 'request',
+          provider: result.promptData.llmRequest.provider,
+          model: result.promptData.llmRequest.model,
+          content: result.promptData.llmRequest.content,
+          timestamp: new Date(),
+          sessionContext: 'multi-agent-critic',
+          messageId: messageId
+        });
+      }
+      
+      if (result.promptData.llmResponse) {
+        this.promptLogging.addPromptLog({
+          type: 'response',
+          provider: result.promptData.llmResponse.provider,
+          model: result.promptData.llmResponse.model,
+          content: result.promptData.llmResponse.content,
+          timestamp: new Date(),
+          sessionContext: 'multi-agent-critic',
+          messageId: messageId
+        });
+      }
+    }
+    
     return result.finalAnswer || result.answer || 'No answer generated';
   }
 

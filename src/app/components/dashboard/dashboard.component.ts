@@ -662,8 +662,27 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.logger.debug('Using MCP provider for multi-agent orchestration', mcpModelSelection);
       }
 
+      // Get temperature and seed parameters (same logic as MCP flow)
+      const modelParams = this.globalModelSelection.getModelParamsForRequest();
+      
+      // Create orchestration request with all parameters
+      const orchestrationRequest = {
+        query: message,
+        modelSelection: mcpModelSelection,
+        temperature: modelParams.temperature,
+        seed: modelParams.seed !== -1 ? modelParams.seed : undefined,
+        enablePromptLogging: this.promptLogging.isLoggingActive()
+      };
+
+      this.logger.debug('Multi-agent orchestration request parameters:', {
+        temperature: orchestrationRequest.temperature,
+        seed: orchestrationRequest.seed,
+        enablePromptLogging: orchestrationRequest.enablePromptLogging,
+        model: mcpModelSelection?.['llm']
+      });
+
       // Process with multi-agent orchestration
-      const orchestrationResponse = await this.multiAgentOrchestrator.processQuery(message, undefined, mcpModelSelection);
+      const orchestrationResponse = await this.multiAgentOrchestrator.processQueryWithParams(orchestrationRequest);
 
       if (orchestrationResponse.success) {
         // Replace the thinking message with the final answer
