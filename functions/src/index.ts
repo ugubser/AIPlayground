@@ -1778,3 +1778,9 @@ export { mcpCalculatorServer } from './mcp-calculator-server';
 
 // Export the Currency MCP server
 export { mcpCurrencyServer } from './mcp-currency-server';
+
+// Export the Multi-Agent system functions
+export { multiAgentPlanner } from './multi-agent-planner';
+export { multiAgentExecutor } from './multi-agent-executor';
+export { multiAgentVerifier } from './multi-agent-verifier';
+export { multiAgentCritic } from './multi-agent-critic';

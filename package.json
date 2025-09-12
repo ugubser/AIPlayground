@@ -27,6 +27,8 @@
     "@angular/platform-browser-dynamic": "^17.3.0",
     "@angular/router": "^17.3.0",
     "@langchain/textsplitters": "^0.0.3",
+    "@types/dagre": "^0.7.53",
+    "dagre": "^0.8.5",
     "firebase": "^12.1.0",
     "langchain": "^0.2.0",
     "marked": "^9.1.6",

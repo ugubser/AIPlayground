@@ -310,6 +310,15 @@
             Enable MCP (Tool Calling)
           </label>
           
+          <label class="mcp-checkbox" *ngIf="mcpEnabled">
+            <input 
+              type="checkbox" 
+              [(ngModel)]="multiAgentEnabled"
+              (change)="onMultiAgentToggle()">
+            <span class="checkmark"></span>
+            Multi-Agent Orchestration
+          </label>
+          
           <div class="mcp-servers" *ngIf="mcpEnabled">
             <h4>MCP Servers ({{ getTotalEnabledTools() }} tools):</h4>
             <div class="server-list-compact">

@@ -12,6 +12,7 @@ import { GlobalModelSelectionService } from '../../services/global-model-selecti
 import { DynamicModelSelection } from '../../services/models-config.service';
 import { McpService } from '../../services/mcp.service';
 import { McpRegistryService, McpServerConfig, McpTool } from '../../services/mcp-registry.service';
+import { MultiAgentOrchestratorService } from '../../services/multi-agent-orchestrator.service';
 import { APP_CONSTANTS } from '../../config/app-constants';
 import { ErrorHandlerService } from '../../services/error-handler.service';
 import { LoggingService } from '../../services/logging.service';
@@ -62,6 +63,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   // MCP (Model Context Protocol) settings
   mcpEnabled = false;
+  multiAgentEnabled = false;
   mcpServers: McpServerConfig[] = [];
   availableTools: McpTool[] = [];
 
@@ -92,6 +94,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     private globalModelSelection: GlobalModelSelectionService,
     private mcpService: McpService,
     private mcpRegistry: McpRegistryService,
+    private multiAgentOrchestrator: MultiAgentOrchestratorService,
     private errorHandler: ErrorHandlerService,
     private logger: LoggingService,
     private utils: SharedUtilsService,
@@ -386,7 +389,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.scrollToBottomAfterDelay(this.generalMessagesContainer);
 
     try {
-      if (this.mcpEnabled) {
+      if (this.mcpEnabled && this.multiAgentEnabled) {
+        // Use Multi-Agent orchestration with MCP tools
+        await this.sendMultiAgentMessage(messageText);
+      } else if (this.mcpEnabled) {
         // Use MCP-enabled chat with tool calling capability - handle responses separately
         await this.sendMcpMessageWithSeparateResponses(messageText);
       } else {
@@ -620,6 +626,91 @@ export class DashboardComponent implements OnInit, OnDestroy {
       
       // Scroll to show the error message
       this.scrollToBottomAfterDelay(this.generalMessagesContainer);
+    }
+  }
+
+  private async sendMultiAgentMessage(message: string): Promise<void> {
+    this.sendingGeneral = true;
+    
+    try {
+      // Check if multi-agent orchestration is available
+      if (!this.multiAgentOrchestrator.isAvailable()) {
+        throw new Error('Multi-agent orchestration requires MCP tools to be available');
+      }
+
+      // Show a "thinking" message immediately
+      const thinkingMessage: ChatMessage = {
+        role: 'assistant',
+        content: '🤔 **Multi-Agent Processing**\n\nAnalyzing your request and planning execution...',
+        createdAt: new Date()
+      };
+      this.generalMessages.push(thinkingMessage);
+      this.scrollToBottomAfterDelay(this.generalMessagesContainer);
+
+      // Get current model selection (same logic as MCP flow)
+      const currentSelection = this.globalModelSelection.getSelectionForRequest();
+      let mcpModelSelection = currentSelection;
+      
+      // If we have an MCP selection in the current selection, use it for LLM
+      if (currentSelection && currentSelection['mcp']) {
+        mcpModelSelection = {
+          llm: {
+            provider: currentSelection['mcp'].provider,
+            model: currentSelection['mcp'].model
+          }
+        };
+        this.logger.debug('Using MCP provider for multi-agent orchestration', mcpModelSelection);
+      }
+
+      // Process with multi-agent orchestration
+      const orchestrationResponse = await this.multiAgentOrchestrator.processQuery(message, undefined, mcpModelSelection);
+
+      if (orchestrationResponse.success) {
+        // Replace the thinking message with the final answer
+        const lastMessageIndex = this.generalMessages.length - 1;
+        this.generalMessages[lastMessageIndex] = {
+          role: 'assistant',
+          content: orchestrationResponse.finalAnswer,
+          createdAt: new Date()
+        };
+
+        // Add execution log to prompt logs if available for debugging
+        if (orchestrationResponse.executionLog.length > 0) {
+          console.log('Multi-Agent Orchestration Log:', {
+            query: message,
+            tasks: orchestrationResponse.tasks,
+            executionLog: orchestrationResponse.executionLog,
+            finalAnswer: orchestrationResponse.finalAnswer
+          });
+        }
+
+      } else {
+        // Show error message
+        const errorMessage = orchestrationResponse.finalAnswer || 'Multi-agent orchestration failed';
+        const lastMessageIndex = this.generalMessages.length - 1;
+        this.generalMessages[lastMessageIndex] = {
+          role: 'assistant',
+          content: `❌ **Multi-Agent Error**\n\n${errorMessage}`,
+          createdAt: new Date()
+        };
+      }
+
+      this.scrollToBottomAfterDelay(this.generalMessagesContainer);
+
+    } catch (error) {
+      // Replace thinking message with error
+      const errorContent = this.errorHandler.createChatErrorMessage(error, 'General');
+      const lastMessageIndex = this.generalMessages.length - 1;
+      
+      this.generalMessages[lastMessageIndex] = {
+        role: 'assistant',
+        content: `❌ **Multi-Agent Error**\n\n${errorContent}`,
+        createdAt: new Date()
+      };
+      
+      this.scrollToBottomAfterDelay(this.generalMessagesContainer);
+    } finally {
+      this.sendingGeneral = false;
     }
   }
 
@@ -931,6 +1022,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
     // Update global model selection service with MCP state
     this.globalModelSelection.updateMcpEnabled(this.mcpEnabled);
     
+    // If MCP is disabled, also disable multi-agent
+    if (!this.mcpEnabled) {
+      this.multiAgentEnabled = false;
+    }
+    
     if (this.mcpEnabled) {
       try {
         // Initialize enabled servers
@@ -956,6 +1052,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
         alert('Failed to connect to MCP servers. Please check server availability.');
       }
     }
+  }
+
+  onMultiAgentToggle() {
+    this.logger.info('Multi-Agent toggled', { enabled: this.multiAgentEnabled });
+    
+    // If multi-agent is disabled, no additional cleanup needed
+    // The orchestration will be handled at message send time
   }
 
   async onServerToggle(serverId: string, event: Event) {
