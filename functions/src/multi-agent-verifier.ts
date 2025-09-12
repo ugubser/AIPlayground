@@ -208,22 +208,22 @@ VERIFICATION RESPONSIBILITIES:
 5. Provide confidence ratings and specific feedback
 
 RESPONSE FORMAT:
-You MUST respond with valid JSON in this exact structure:
+You MUST respond with valid JSON in this exact structure. Keep ALL text fields concise (100-500 characters max):
 {
   "overallCorrect": boolean,
   "confidence": number (0-100),
-  "reasoning": "Overall assessment explanation",
+  "reasoning": "Brief overall assessment (100-500 chars)",
   "taskVerifications": [
     {
       "taskId": "task_1",
       "isCorrect": boolean,
-      "reasoning": "Specific assessment for this task",
+      "reasoning": "Concise task assessment (100-300 chars)",
       "confidence": number (0-100),
-      "issues": ["list of any issues found"]
+      "issues": ["brief issue descriptions"]
     }
   ],
-  "finalAnswer": "Synthesized answer based on verified results",
-  "recommendations": ["suggestions for improvement"]
+  "finalAnswer": "Concise synthesized answer (100-500 chars)",
+  "recommendations": ["brief suggestions (50-200 chars each)"]
 }
 
 VERIFICATION CRITERIA:
@@ -231,7 +231,9 @@ VERIFICATION CRITERIA:
 - Relevance: Do results address the original query?
 - Completeness: Is anything important missing?
 - Consistency: Do results contradict each other?
-- Quality: Are results clear and useful?`;
+- Quality: Are results clear and useful?
+
+IMPORTANT: Keep all text responses concise and focused. Aim for brevity while maintaining clarity.`;
 
 function createVerificationPrompt(originalQuery: string, tasks: any[]): string {
   let prompt = `ORIGINAL USER QUERY: ${originalQuery}
@@ -240,10 +242,19 @@ TASK RESULTS TO VERIFY:
 `;
 
   tasks.forEach(task => {
+    // Truncate large task results to prevent context overflow
+    let resultText = typeof task.result === 'string' ? task.result : JSON.stringify(task.result, null, 2);
+    
+    // Limit result text to ~1000 characters per task to prevent context overflow
+    const maxResultLength = 1000;
+    if (resultText.length > maxResultLength) {
+      resultText = resultText.substring(0, maxResultLength) + '\n... [TRUNCATED - Result was longer]';
+    }
+    
     prompt += `
 Task ID: ${task.id}
 Description: ${task.description}
-Result: ${typeof task.result === 'string' ? task.result : JSON.stringify(task.result, null, 2)}
+Result: ${resultText}
 ---`;
   });
 

@@ -113,7 +113,7 @@ export const multiAgentExecutor = onRequest(
 
       // Use pre-filtered tools if provided, otherwise get available tools for this task
       let availableTools: any[];
-      if (preFilteredTools && preFilteredTools.length > 0) {
+      if (preFilteredTools !== undefined) {
         availableTools = preFilteredTools;
         logger.info('Using pre-filtered tools', { 
           taskId: task.id,
@@ -134,7 +134,7 @@ export const multiAgentExecutor = onRequest(
         console.log('🔧 Available Tools for Task:', JSON.stringify({
           taskId: task.id,
           requestedTools: task.tools,
-          usingPreFiltered: !!(preFilteredTools && preFilteredTools.length > 0),
+          usingPreFiltered: preFilteredTools !== undefined,
           availableTools: availableTools.map(t => ({
             name: t.function?.name || t.name,
             description: (t.function?.description || t.description)?.substring(0, 100) + '...'
