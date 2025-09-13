@@ -24,7 +24,7 @@ export class AppComponent implements OnInit {
   loading = false;
   currentAppName = 'rag';
   showPrompts = false;
-  temperature: number = 1.0;
+  temperature: number = 0.7;
   seed: number = -1;
 
   constructor(

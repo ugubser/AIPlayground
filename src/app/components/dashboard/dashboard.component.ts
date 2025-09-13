@@ -64,7 +64,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   // MCP (Model Context Protocol) settings
   mcpEnabled = false;
   multiAgentEnabled = false;
-  skipCriticPhase = true; // Default to true (skip critic phase)
+  skipCriticPhase = false; // Default to false (include critic phase)
   mcpServers: McpServerConfig[] = [];
   availableTools: McpTool[] = [];
 
