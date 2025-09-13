@@ -9,7 +9,7 @@ export interface PromptLogEntry {
   timestamp: Date;
   content: string;
   expanded: boolean;
-  sessionContext?: 'rag' | 'general' | 'vision' | 'mcp' | 'multi-agent-planner' | 'multi-agent-verifier' | 'multi-agent-critic' | string;
+  sessionContext?: 'rag' | 'general' | 'vision' | 'mcp' | 'mcp-tool-call' | 'multi-agent-planner' | 'multi-agent-verifier' | 'multi-agent-critic' | string;
   messageId?: string;
   metadata?: Record<string, any>;
 }

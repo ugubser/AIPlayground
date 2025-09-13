@@ -40,6 +40,7 @@ export interface ChatMessage {
 export interface ToolCallResponse {
   content: string;
   toolCalls: any[];
+  mcpPromptData?: any[];
 }
 
 const isEmulator = process.env.FUNCTIONS_EMULATOR === 'true';
@@ -148,12 +149,13 @@ export async function getLLMResponse(
 }
 
 export async function getLLMResponseWithTools(
-  messages: ChatMessage[], 
+  messages: ChatMessage[],
   model?: string,
   tools?: any[],
   taskId?: string,
   temperature?: number,
-  seed?: number
+  seed?: number,
+  enablePromptLogging?: boolean
 ): Promise<ToolCallResponse> {
   
   const actualLlmModel = model || 'meta-llama/llama-4-maverick:free';
@@ -280,13 +282,15 @@ export async function getLLMResponseWithTools(
 
     for (const toolCall of toolCalls) {
       try {
-        const result = await callMcpTool(
+        const mcpCallResult = await callMcpTool(
           toolCall.function.name,
-          JSON.parse(toolCall.function.arguments || '{}')
+          JSON.parse(toolCall.function.arguments || '{}'),
+          enablePromptLogging || false
         );
         toolResults.push({
           toolCall,
-          result
+          result: mcpCallResult.result,
+          promptData: mcpCallResult.promptData
         });
       } catch (error: any) {
         logger.error('Tool call failed', {
@@ -313,15 +317,22 @@ export async function getLLMResponseWithTools(
     ];
 
     const followUpResponse = await getLLMResponse(followUpMessages, model);
-    
+
+    // Extract MCP prompt data from tool results
+    const mcpPromptData = toolResults
+      .filter(tr => tr.promptData)
+      .map(tr => tr.promptData);
+
     return {
       content: followUpResponse,
-      toolCalls: toolResults
+      toolCalls: toolResults,
+      mcpPromptData: mcpPromptData.length > 0 ? mcpPromptData : undefined
     };
   }
 
   return {
     content,
-    toolCalls: []
+    toolCalls: [],
+    mcpPromptData: undefined
   };
 }

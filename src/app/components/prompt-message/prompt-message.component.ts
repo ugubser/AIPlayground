@@ -7,10 +7,12 @@ import { PromptLogEntry, PromptLoggingService } from '../../services/prompt-logg
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div class="prompt-message" 
-         [class.request]="entry.type === 'request'" 
-         [class.response]="entry.type === 'response'"
-         [class.search-results]="isSearchResults">
+    <div class="prompt-message"
+         [class.request]="entry.type === 'request' && !isMcpQuery && !isMcpResponse"
+         [class.response]="entry.type === 'response' && !isMcpQuery && !isMcpResponse"
+         [class.search-results]="isSearchResults"
+         [class.mcp-query]="isMcpQuery"
+         [class.mcp-response]="isMcpResponse">
       <div class="prompt-header">
         <span class="prompt-label">
           {{ entry.type === 'request' ? '📤' : '📥' }}
@@ -129,6 +131,40 @@ import { PromptLogEntry, PromptLoggingService } from '../../services/prompt-logg
     .prompt-message.search-results:hover {
       background-color: rgba(23, 162, 184, 0.08);
     }
+
+    .prompt-message.mcp-query {
+      border-color: #28a745 !important;
+      background-color: rgba(40, 167, 69, 0.05) !important;
+    }
+
+    .prompt-message.mcp-query .prompt-label {
+      color: #28a745 !important;
+    }
+
+    .prompt-message.mcp-query .prompt-text {
+      color: #28a745 !important;
+    }
+
+    .prompt-message.mcp-query:hover {
+      background-color: rgba(40, 167, 69, 0.08) !important;
+    }
+
+    .prompt-message.mcp-response {
+      border-color: #17a2b8 !important;
+      background-color: rgba(23, 162, 184, 0.05) !important;
+    }
+
+    .prompt-message.mcp-response .prompt-label {
+      color: #17a2b8 !important;
+    }
+
+    .prompt-message.mcp-response .prompt-text {
+      color: #17a2b8 !important;
+    }
+
+    .prompt-message.mcp-response:hover {
+      background-color: rgba(23, 162, 184, 0.08) !important;
+    }
   `]
 })
 export class PromptMessageComponent {
@@ -150,6 +186,14 @@ export class PromptMessageComponent {
 
   get isSearchResults(): boolean {
     return this.entry.provider === 'RAG Search' && this.entry.model === 'Document Search';
+  }
+
+  get isMcpQuery(): boolean {
+    return this.entry.sessionContext === 'mcp-tool-call' && this.entry.type === 'request';
+  }
+
+  get isMcpResponse(): boolean {
+    return this.entry.sessionContext === 'mcp-tool-call' && this.entry.type === 'response';
   }
 
   toggleExpanded(): void {

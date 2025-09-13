@@ -161,7 +161,7 @@ export const multiAgentExecutor = onRequest(
             role: 'user',
             content: executionPrompt
           }
-        ], actualModel, availableTools, task.id, temperature, seed);
+        ], actualModel, availableTools, task.id, temperature, seed, enablePromptLogging);
 
         result = toolResponse.content;
         toolCalls = toolResponse.toolCalls || [];

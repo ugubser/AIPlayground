@@ -334,8 +334,39 @@ export class MultiAgentOrchestratorService {
             messageId: messageId
           });
         }
+
+        // Log MCP prompt data if available
+        if (result.mcpPromptData && Array.isArray(result.mcpPromptData)) {
+          for (const mcpData of result.mcpPromptData) {
+            const mcpMessageId = `multiagent_mcp_${task.id}_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+
+            if (mcpData.mcpRequest) {
+              this.promptLogging.addPromptLog({
+                type: 'request',
+                provider: 'MCP Server',
+                model: mcpData.mcpRequest.server,
+                content: `Tool: ${mcpData.mcpRequest.toolName}\nArguments: ${JSON.stringify(mcpData.mcpRequest.arguments, null, 2)}`,
+                timestamp: new Date(),
+                sessionContext: 'mcp-tool-call',
+                messageId: messageId  // Use the main LLM message ID to group MCP logs with the assistant response
+              });
+            }
+
+            if (mcpData.mcpResponse) {
+              this.promptLogging.addPromptLog({
+                type: 'response',
+                provider: 'MCP Server',
+                model: mcpData.mcpResponse.server,
+                content: JSON.stringify(mcpData.mcpResponse.result, null, 2),
+                timestamp: new Date(),
+                sessionContext: 'mcp-tool-call',
+                messageId: messageId  // Use the main LLM message ID to group MCP logs with the assistant response
+              });
+            }
+          }
+        }
       }
-      
+
       // Store result for dependent tasks
       this.taskManager.setTaskResult(task.id, result);
       

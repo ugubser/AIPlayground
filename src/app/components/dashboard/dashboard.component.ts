@@ -460,7 +460,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         for (const toolCall of mcpResponse.toolCalls) {
           try {
             this.logger.debug('Executing tool call', toolCall);
-            const result = await this.mcpService.callTool(toolCall);
+            const result = await this.mcpService.callTool(toolCall, conversationMessageId);
             const toolOutput = result.content.map(c => c.text).join(' ');
             
             toolResults.push({
@@ -564,7 +564,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         for (const toolCall of mcpResponse.toolCalls) {
           try {
             this.logger.debug('Executing tool call', toolCall);
-            const result = await this.mcpService.callTool(toolCall);
+            const result = await this.mcpService.callTool(toolCall, conversationMessageId);
             const toolOutput = result.content.map(c => c.text).join(' ');
             
             toolResults.push({
@@ -598,7 +598,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
           content: this.formatAnswerContent(finalResponse.answer),
           createdAt: new Date()
         });
-        
+
+        // Update MCP prompt logs to use the final message ID
+        this.updateMcpPromptLogs(finalMessageId);
+
         // Scroll to show the final response
         this.scrollToBottomAfterDelay(this.generalMessagesContainer);
         
@@ -610,7 +613,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
           content: mcpResponse.answer,
           createdAt: new Date()
         });
-        
+
+        // Update MCP prompt logs to use the conversation message ID
+        this.updateMcpPromptLogs(conversationMessageId);
+
         // Scroll to show the response
         this.scrollToBottomAfterDelay(this.generalMessagesContainer);
       }
@@ -1194,20 +1200,41 @@ export class DashboardComponent implements OnInit, OnDestroy {
    * This connects the multi-agent prompts to the final assistant message for display
    */
   private updateMultiAgentPromptLogs(messageId: string): void {
-    // Get recent multi-agent prompt logs (last 2 minutes to be safe)
+    // Get recent multi-agent and MCP prompt logs (last 2 minutes to be safe)
     const cutoffTime = new Date(Date.now() - 2 * 60 * 1000);
-    const recentMultiAgentLogs = this.promptLogs.filter(log => 
+    const recentLogs = this.promptLogs.filter(log =>
       log.timestamp > cutoffTime &&
-      (log.sessionContext?.startsWith('multi-agent') || false)
+      (log.sessionContext?.startsWith('multi-agent') || log.sessionContext === 'mcp-tool-call')
     );
 
     // Update their message IDs to connect them to this assistant message
-    recentMultiAgentLogs.forEach(log => {
+    recentLogs.forEach(log => {
       // Update the log entry in the prompt logging service
       this.promptLogging.updatePromptLogMessageId(log.id, messageId);
     });
 
-    console.log(`Updated ${recentMultiAgentLogs.length} multi-agent prompt logs with message ID: ${messageId}`);
+    console.log(`Updated ${recentLogs.length} multi-agent and MCP prompt logs with message ID: ${messageId}`);
+  }
+
+  /**
+   * Updates recent MCP prompt logs to use the specified message ID
+   * This connects the MCP prompts to the assistant message for display
+   */
+  private updateMcpPromptLogs(messageId: string): void {
+    // Get recent MCP prompt logs (last 30 seconds to be precise)
+    const cutoffTime = new Date(Date.now() - 30 * 1000);
+    const recentMcpLogs = this.promptLogs.filter(log =>
+      log.timestamp > cutoffTime &&
+      log.sessionContext === 'mcp-tool-call'
+    );
+
+    // Update their message IDs to connect them to this assistant message
+    recentMcpLogs.forEach(log => {
+      // Update the log entry in the prompt logging service
+      this.promptLogging.updatePromptLogMessageId(log.id, messageId);
+    });
+
+    console.log(`Updated ${recentMcpLogs.length} MCP prompt logs with message ID: ${messageId}`);
   }
 
   ngOnDestroy() {

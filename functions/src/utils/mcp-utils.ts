@@ -128,7 +128,22 @@ export async function getToolDefinitionsFromServers(): Promise<ToolDefinition[]>
   return allTools;
 }
 
-export async function callMcpTool(toolName: string, arguments_: Record<string, any>): Promise<any> {
+export interface McpCallResult {
+  result: any;
+  promptData?: {
+    mcpRequest: {
+      server: string;
+      toolName: string;
+      arguments: Record<string, any>;
+    };
+    mcpResponse: {
+      server: string;
+      result: any;
+    };
+  };
+}
+
+export async function callMcpTool(toolName: string, arguments_: Record<string, any>, enablePromptLogging: boolean = false): Promise<McpCallResult> {
   // Find which server provides this tool
   for (const server of MCP_SERVERS) {
     try {
@@ -181,7 +196,26 @@ export async function callMcpTool(toolName: string, arguments_: Record<string, a
         arguments: arguments_
       });
 
-      return callData.result;
+      const mcpResult: McpCallResult = {
+        result: callData.result
+      };
+
+      // Add logging data if prompt logging is enabled
+      if (enablePromptLogging) {
+        mcpResult.promptData = {
+          mcpRequest: {
+            server: server.name,
+            toolName,
+            arguments: arguments_
+          },
+          mcpResponse: {
+            server: server.name,
+            result: callData.result
+          }
+        };
+      }
+
+      return mcpResult;
 
     } catch (error: any) {
       logger.error('Error calling MCP tool', {

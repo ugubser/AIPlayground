@@ -7,7 +7,7 @@ import { McpRegistryService, McpToolCall, McpToolResult } from './mcp-registry.s
 export class McpService {
   constructor(private mcpRegistry: McpRegistryService) {}
 
-  async callTool(toolCall: { name: string; arguments: Record<string, any> }): Promise<McpToolResult> {
+  async callTool(toolCall: { name: string; arguments: Record<string, any> }, messageId?: string): Promise<McpToolResult> {
     // Find which server provides this tool
     const availableTools = this.mcpRegistry.getAvailableTools();
     const tool = availableTools.find(t => t.name === toolCall.name);
@@ -22,6 +22,6 @@ export class McpService {
       arguments: toolCall.arguments
     };
 
-    return this.mcpRegistry.callTool(mcpToolCall);
+    return this.mcpRegistry.callTool(mcpToolCall, messageId);
   }
 }

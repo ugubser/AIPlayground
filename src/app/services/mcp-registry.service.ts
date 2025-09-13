@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
+import { PromptLoggingService } from './prompt-logging.service';
 
 export interface McpServerConfig {
   id: string;
@@ -48,7 +49,7 @@ export class McpRegistryService {
   private availableToolsSubject = new BehaviorSubject<McpTool[]>([]);
   public availableTools$: Observable<McpTool[]> = this.availableToolsSubject.asObservable();
 
-  constructor() {
+  constructor(private promptLogging: PromptLoggingService) {
     this.initializeDefaultServers();
   }
 
@@ -229,15 +230,30 @@ export class McpRegistryService {
     }
   }
 
-  async callTool(toolCall: McpToolCall): Promise<McpToolResult> {
+  async callTool(toolCall: McpToolCall, messageId?: string): Promise<McpToolResult> {
     const server = this.serversSubject.value.find(s => s.id === toolCall.serverId);
-    
+
     if (!server) {
       throw new Error(`Server not found: ${toolCall.serverId}`);
     }
 
     if (!server.enabled || server.status !== 'online') {
       throw new Error(`Server not available: ${server.name}`);
+    }
+
+    const promptMessageId = messageId || `mcp_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+
+    // Log MCP query if prompt logging is enabled
+    if (this.promptLogging.isLoggingActive()) {
+      this.promptLogging.addPromptLog({
+        type: 'request',
+        provider: 'MCP Server',
+        model: server.name,
+        content: `Tool: ${toolCall.toolName}\nArguments: ${JSON.stringify(toolCall.arguments, null, 2)}`,
+        timestamp: new Date(),
+        sessionContext: 'mcp-tool-call',
+        messageId: promptMessageId
+      });
     }
 
     const response = await fetch(`${server.url}/tools/call`, {
@@ -258,9 +274,22 @@ export class McpRegistryService {
     }
 
     const data = await response.json();
-    
+
     if (data.error) {
       throw new Error(`Tool error: ${data.error.message}`);
+    }
+
+    // Log MCP response if prompt logging is enabled
+    if (this.promptLogging.isLoggingActive()) {
+      this.promptLogging.addPromptLog({
+        type: 'response',
+        provider: 'MCP Server',
+        model: server.name,
+        content: JSON.stringify(data.result, null, 2),
+        timestamp: new Date(),
+        sessionContext: 'mcp-tool-call',
+        messageId: promptMessageId
+      });
     }
 
     return data.result;
