@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { TaskDependencyManagerService } from './task-dependency-manager.service';
 import { ExecutionLoggerService } from './execution-logger.service';
-import { McpRegistryService, McpTool } from './mcp-registry.service';
+import { McpRegistryService } from './mcp-registry.service';
 import { PromptLoggingService } from './prompt-logging.service';
 import { environment } from '../../environments/environment';
 
@@ -209,31 +209,53 @@ export class MultiAgentOrchestratorService {
 
   private async executionPhase(plan: ExecutionPlan, modelSelection?: any, temperature?: number, seed?: number, enablePromptLogging?: boolean): Promise<Task[]> {
     const allTasks = [...plan.tasks];
-    
+
     // Get all available tools once at the beginning to avoid redundant calls
     const availableTools = this.mcpRegistry.getAvailableTools();
     console.log('🔧 Cached tools for execution phase:', {
       totalTools: availableTools.length,
       toolNames: availableTools.map(t => t.name)
     });
-    
+
     // Execute tasks in parallel groups based on dependencies
     for (const parallelGroup of plan.parallelGroups) {
-      const executionPromises = parallelGroup.map(task => this.executeTask(task, modelSelection, temperature, seed, enablePromptLogging, availableTools));
-      const results = await Promise.allSettled(executionPromises);
-      
-      // Update task statuses based on results
-      results.forEach((result, index) => {
-        const task = parallelGroup[index];
-        if (result.status === 'fulfilled') {
+      if (parallelGroup.length === 1) {
+        // For single tasks, use the existing individual executor
+        const task = parallelGroup[0];
+        try {
+          const result = await this.executeTask(task, modelSelection, temperature, seed, enablePromptLogging, availableTools);
           task.status = 'completed';
-          task.result = result.value;
-        } else {
+          task.result = result;
+        } catch (error: any) {
           task.status = 'failed';
-          task.error = result.reason?.message || 'Unknown error';
+          task.error = error.message || 'Unknown error';
         }
-      });
-      
+      } else {
+        // For multiple tasks, use multi-task execution
+        try {
+          const multiTaskResult = await this.executeMultipleTasks(parallelGroup, modelSelection, temperature, seed, enablePromptLogging, availableTools);
+
+          // Update task statuses based on results
+          parallelGroup.forEach(task => {
+            if (multiTaskResult.taskResults[task.id]) {
+              task.status = 'completed';
+              task.result = multiTaskResult.taskResults[task.id];
+              // Store result for dependent tasks
+              this.taskManager.setTaskResult(task.id, task.result);
+            } else {
+              task.status = 'failed';
+              task.error = 'No result returned for task';
+            }
+          });
+        } catch (error: any) {
+          // If multi-task execution fails, mark all tasks as failed
+          parallelGroup.forEach(task => {
+            task.status = 'failed';
+            task.error = error.message || 'Multi-task execution error';
+          });
+        }
+      }
+
       // Check if any critical tasks failed
       const failedTasks = parallelGroup.filter(t => t.status === 'failed');
       if (failedTasks.length > 0) {
@@ -247,7 +269,7 @@ export class MultiAgentOrchestratorService {
         break;
       }
     }
-    
+
     return allTasks;
   }
 
@@ -353,8 +375,6 @@ export class MultiAgentOrchestratorService {
           });
 
           for (const mcpData of result.mcpPromptData) {
-            const mcpMessageId = `multiagent_mcp_${task.id}_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-
             if (mcpData.mcpRequest) {
               console.log('🟢 Multi-Agent: Adding MCP Query log');
               this.promptLogging.addPromptLog({
@@ -395,6 +415,154 @@ export class MultiAgentOrchestratorService {
       this.logger.logTaskError(task, error);
       throw error;
     }
+  }
+
+  private async executeMultipleTasks(
+    tasks: Task[],
+    modelSelection?: any,
+    temperature?: number,
+    seed?: number,
+    enablePromptLogging?: boolean,
+    availableTools?: any[]
+  ): Promise<{taskResults: Record<string, any>; toolCalls: any[]; success: boolean; mcpPromptData?: any[]}> {
+    console.log(`🔄 Multi-task executing ${tasks.length} tasks:`, tasks.map(t => t.id));
+
+    // Prepare tasks for execution
+    const multiTasks = tasks.map(task => ({
+      id: task.id,
+      description: task.description,
+      tools: task.tools,
+      dependencyResults: this.taskManager.getDependencyResults(task.id)
+    }));
+
+    // Collect all required tools from all tasks
+    const allRequiredTools = Array.from(new Set(tasks.flatMap(task => task.tools || [])));
+
+    // Filter available tools to only those needed for these tasks
+    const filteredMcpTools = availableTools ? availableTools.filter(tool =>
+      allRequiredTools.includes(tool.name)
+    ) : [];
+
+    // Convert MCP tools to OpenAI tool format expected by LLM utils
+    const taskTools = filteredMcpTools.map(mcpTool => ({
+      type: 'function',
+      function: {
+        name: mcpTool.name,
+        description: mcpTool.description,
+        parameters: mcpTool.inputSchema
+      }
+    }));
+
+    console.log(`🔧 Multi-task tools prepared:`, {
+      allRequiredTools,
+      availableToolsCount: taskTools.length,
+      toolNames: taskTools.map(t => t.function.name)
+    });
+
+    const multiTaskRequest = {
+      tasks: multiTasks,
+      enablePromptLogging: enablePromptLogging !== undefined ? enablePromptLogging : this.promptLogging.isLoggingActive(),
+      modelSelection: modelSelection,
+      temperature: temperature,
+      seed: seed,
+      preFilteredTools: taskTools
+    };
+
+    // Log to prompt logging if enabled
+    if (this.promptLogging.isLoggingActive()) {
+      console.log(`⚡ Multi-Agent Multi-Task Execution:`, {
+        taskCount: tasks.length,
+        taskIds: tasks.map(t => t.id),
+        toolCount: taskTools.length
+      });
+    }
+
+    const response = await fetch(`${this.functionsUrl}/multiAgentMultiTaskExecutor`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(multiTaskRequest)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Multi-task executor failed: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    this.logger.logPhase('execution', {
+      taskCount: tasks.length,
+      success: result.success,
+      toolCallsCount: result.toolCalls?.length || 0
+    });
+
+    // Log prompt data if available and enabled
+    if (result.promptData && (enablePromptLogging !== undefined ? enablePromptLogging : this.promptLogging.isLoggingActive())) {
+      const messageId = `multiagent_multitask_${tasks.map(t => t.id).join('_')}_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+
+      if (result.promptData.llmRequest) {
+        this.promptLogging.addPromptLog({
+          type: 'request',
+          provider: result.promptData.llmRequest.provider,
+          model: result.promptData.llmRequest.model,
+          content: result.promptData.llmRequest.content,
+          timestamp: new Date(),
+          sessionContext: `multi-agent-multi-task-executor`,
+          messageId: messageId
+        });
+      }
+
+      if (result.promptData.llmResponse) {
+        this.promptLogging.addPromptLog({
+          type: 'response',
+          provider: result.promptData.llmResponse.provider,
+          model: result.promptData.llmResponse.model,
+          content: result.promptData.llmResponse.content,
+          timestamp: new Date(),
+          sessionContext: `multi-agent-multi-task-executor`,
+          messageId: messageId
+        });
+      }
+
+      // Log MCP prompt data if available
+      if (result.mcpPromptData && Array.isArray(result.mcpPromptData)) {
+        console.log('🔧 Multi-Agent Multi-Task: Processing MCP prompt data:', {
+          taskCount: tasks.length,
+          mcpDataCount: result.mcpPromptData.length,
+          messageId: messageId
+        });
+
+        for (const mcpData of result.mcpPromptData) {
+          if (mcpData.mcpRequest) {
+            console.log('🟢 Multi-Agent Multi-Task: Adding MCP Query log');
+            this.promptLogging.addPromptLog({
+              type: 'request',
+              provider: 'MCP Server',
+              model: mcpData.mcpRequest.server,
+              content: `Tool: ${mcpData.mcpRequest.toolName}\nArguments: ${JSON.stringify(mcpData.mcpRequest.arguments, null, 2)}`,
+              timestamp: new Date(),
+              sessionContext: 'mcp-tool-call',
+              messageId: messageId
+            });
+          }
+
+          if (mcpData.mcpResponse) {
+            console.log('🔵 Multi-Agent Multi-Task: Adding MCP Response log');
+            this.promptLogging.addPromptLog({
+              type: 'response',
+              provider: 'MCP Server',
+              model: mcpData.mcpResponse.server,
+              content: JSON.stringify(mcpData.mcpResponse.result, null, 2),
+              timestamp: new Date(),
+              sessionContext: 'mcp-tool-call',
+              messageId: messageId
+            });
+          }
+        }
+      } else {
+        console.log('🚫 Multi-Agent Multi-Task: No MCP prompt data found');
+      }
+    }
+
+    return result;
   }
 
   private async verificationPhase(tasks: Task[], originalQuery: string, modelSelection?: any, temperature?: number, seed?: number, enablePromptLogging?: boolean): Promise<any> {

@@ -21,10 +21,35 @@ interface ExecutorRequest {
   preFilteredTools?: any[]; // Pre-filtered tools to avoid redundant server calls
 }
 
+interface MultiTaskExecutorRequest {
+  tasks: Array<{
+    id: string;
+    description: string;
+    tools: string[];
+    dependencyResults: Record<string, any>;
+  }>;
+  modelSelection?: any;
+  temperature?: number;
+  seed?: number;
+  enablePromptLogging?: boolean;
+  preFilteredTools?: any[];
+}
+
 interface ExecutorResponse {
   taskId: string;
   result: any;
   reasoning: string;
+  toolCalls: any[];
+  success: boolean;
+  promptData?: {
+    llmRequest?: any;
+    llmResponse?: any;
+  };
+  mcpPromptData?: any[];
+}
+
+interface MultiTaskExecutorResponse {
+  taskResults: Record<string, any>;
   toolCalls: any[];
   success: boolean;
   promptData?: {
@@ -292,6 +317,190 @@ export const multiAgentExecutor = onRequest(
   }
 );
 
+export const multiAgentMultiTaskExecutor = onRequest(
+  {
+    timeoutSeconds: 540,
+    memory: '2GiB',
+    cors: true
+  },
+  async (req, res) => {
+    try {
+      // Handle CORS preflight
+      if (req.method === 'OPTIONS') {
+        handleCorsPreflightRequest(res);
+        return;
+      }
+
+      // Set CORS headers
+      const corsHeaders = getCorsHeaders();
+      Object.keys(corsHeaders).forEach(key => {
+        res.set(key, corsHeaders[key]);
+      });
+
+      if (req.method !== 'POST') {
+        logger.warn('Invalid method for multi-task executor', { method: req.method });
+        res.status(405).json({ error: 'Method not allowed' });
+        return;
+      }
+
+      const { tasks, modelSelection, temperature, seed, enablePromptLogging = false, preFilteredTools }: MultiTaskExecutorRequest = req.body;
+
+      if (!tasks || !Array.isArray(tasks) || tasks.length === 0) {
+        logger.warn('Missing required tasks array', { tasksProvided: !!tasks, isArray: Array.isArray(tasks), length: tasks?.length });
+        res.status(400).json({ error: 'Tasks array is required' });
+        return;
+      }
+
+      // Validate each task
+      for (const task of tasks) {
+        if (!task.id || !task.description) {
+          logger.warn('Invalid task', { taskId: task.id, hasDescription: !!task.description });
+          res.status(400).json({ error: 'Each task must have id and description' });
+          return;
+        }
+      }
+
+      // Collect all required tools from all tasks
+      const allRequiredTools = Array.from(new Set(tasks.flatMap(task => task.tools || [])));
+
+      // Must have pre-filtered tools - no fallback
+      if (!preFilteredTools || preFilteredTools.length === 0) {
+        logger.error('No tools available for multi-task execution', {
+          taskCount: tasks.length,
+          allRequiredTools: allRequiredTools
+        });
+        res.status(400).json({ error: 'No tools available for execution' });
+        return;
+      }
+
+      // Determine which model to use
+      let actualModel = DEFAULT_MCP_MODEL;
+      if (modelSelection && modelSelection.llm) {
+        actualModel = modelSelection.llm.model;
+      }
+
+      logger.info('Executing multi-task request', {
+        taskCount: tasks.length,
+        taskIds: tasks.map(t => t.id),
+        toolCount: preFilteredTools.length,
+        model: actualModel
+      });
+
+      // Create simple execution prompt that just lists all tasks
+      let executionPrompt = `Execute these ${tasks.length} tasks:\n\n`;
+      for (const task of tasks) {
+        executionPrompt += `Task ${task.id}: ${task.description}\n`;
+        if (task.dependencyResults && Object.keys(task.dependencyResults).length > 0) {
+          executionPrompt += `Dependencies: ${JSON.stringify(task.dependencyResults)}\n`;
+        }
+        executionPrompt += `\n`;
+      }
+
+      // Execute with tools
+      const toolResponse = await getLLMResponseWithTools([
+        {
+          role: 'system',
+          content: MULTI_TASK_EXECUTOR_SYSTEM_PROMPT
+        },
+        {
+          role: 'user',
+          content: executionPrompt
+        }
+      ], actualModel, preFilteredTools, `multitask_${tasks.map(t => t.id).join('_')}`, temperature, seed, enablePromptLogging);
+
+      // Extract task results from tool calls - each tool call should map to a task
+      const taskResults: Record<string, any> = {};
+
+      // Map tool call results back to tasks based on the tool calls made
+      if (toolResponse.toolCalls && toolResponse.toolCalls.length > 0) {
+        // For now, we'll assume the tool results are in the same order as tasks
+        // This is simplified - in reality we'd need smarter mapping
+        toolResponse.toolCalls.forEach((toolCall: any, index: number) => {
+          if (index < tasks.length) {
+            taskResults[tasks[index].id] = toolCall.result;
+          }
+        });
+      }
+
+      const response: MultiTaskExecutorResponse = {
+        taskResults,
+        toolCalls: toolResponse.toolCalls || [],
+        success: true
+      };
+
+      // Add MCP prompt data if available
+      if (toolResponse.mcpPromptData) {
+        response.mcpPromptData = toolResponse.mcpPromptData;
+      }
+
+      // Add prompt data if logging is enabled
+      if (enablePromptLogging) {
+        const messages = [
+          {
+            role: 'system',
+            content: MULTI_TASK_EXECUTOR_SYSTEM_PROMPT
+          },
+          {
+            role: 'user',
+            content: executionPrompt
+          }
+        ];
+
+        const requestBody: any = {
+          model: actualModel,
+          messages: messages,
+          temperature: temperature !== undefined ? temperature : 0.7,
+          max_tokens: 4000,
+          tools: preFilteredTools,
+          tool_choice: 'auto'
+        };
+
+        if (seed !== undefined && seed !== -1) {
+          requestBody.seed = seed;
+        }
+
+        response.promptData = {
+          llmRequest: {
+            provider: 'openrouter.ai',
+            model: actualModel,
+            content: JSON.stringify(requestBody, null, 2)
+          },
+          llmResponse: {
+            provider: 'openrouter.ai',
+            model: actualModel,
+            content: JSON.stringify({
+              taskResults: taskResults,
+              toolCalls: toolResponse.toolCalls
+            }, null, 2)
+          }
+        };
+      }
+
+      logger.info('Multi-task execution completed', {
+        taskCount: tasks.length,
+        toolCallsCount: toolResponse.toolCalls?.length || 0,
+        success: true
+      });
+
+      res.json(response);
+
+    } catch (error: any) {
+      logger.error('Error in multi-task executor', {
+        error: error.message,
+        stack: error.stack,
+        taskCount: req.body?.tasks?.length || 0
+      });
+
+      res.status(500).json({
+        taskResults: {},
+        toolCalls: [],
+        success: false,
+        error: error.message
+      });
+    }
+  }
+);
+
 const EXECUTOR_SYSTEM_PROMPT = `You are a multi-agent task executor. Your role is to complete specific tasks using the available tools.
 
 EXECUTION GUIDELINES:
@@ -325,6 +534,10 @@ RESPONSE FORMAT:
 - Include any relevant data for dependent tasks
 
 Remember: You are executing ONE specific task. Focus only on that task and provide the best possible answer based on available information.`;
+
+const MULTI_TASK_EXECUTOR_SYSTEM_PROMPT = `You are a multi-agent task executor. Execute all the provided tasks using the available tools.
+
+Use the tools efficiently to complete all tasks. Call the required tools for each task as needed.`;
 
 function createExecutionPrompt(task: any): string {
   let prompt = `TASK TO EXECUTE:
@@ -409,3 +622,4 @@ function extractReasoningFromResult(result: string): string {
 
   return 'Task completed successfully';
 }
+
