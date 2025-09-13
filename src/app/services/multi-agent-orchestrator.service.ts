@@ -37,6 +37,7 @@ export interface MultiAgentRequest {
   temperature?: number;
   seed?: number;
   enablePromptLogging?: boolean;
+  skipCriticPhase?: boolean;
 }
 
 @Injectable({
@@ -88,10 +89,18 @@ export class MultiAgentOrchestratorService {
       // Phase 3: Verification
       const verification = await this.verificationPhase(executedTasks, request.query, request.modelSelection, request.temperature, request.seed, request.enablePromptLogging);
       this.logger.logPhase('verification', verification);
-      
-      // Phase 4: Final formatting
-      const finalAnswer = await this.criticPhase(verification, request.query, request.modelSelection, request.temperature, request.seed, request.enablePromptLogging);
-      this.logger.logPhase('critic', { answerLength: finalAnswer.length });
+
+      // Phase 4: Final formatting (skip critic if requested)
+      let finalAnswer: string;
+      if (request.skipCriticPhase) {
+        // Skip critic phase and use verifier result as final answer
+        finalAnswer = verification.finalAnswer;
+        this.logger.logPhase('critic', { skipped: true, answerLength: finalAnswer.length });
+      } else {
+        // Run critic phase for final formatting
+        finalAnswer = await this.criticPhase(verification, request.query, request.modelSelection, request.temperature, request.seed, request.enablePromptLogging);
+        this.logger.logPhase('critic', { answerLength: finalAnswer.length });
+      }
       
       const response: MultiAgentResponse = {
         finalAnswer,

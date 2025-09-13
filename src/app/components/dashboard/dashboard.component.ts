@@ -64,6 +64,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   // MCP (Model Context Protocol) settings
   mcpEnabled = false;
   multiAgentEnabled = false;
+  skipCriticPhase = true; // Default to true (skip critic phase)
   mcpServers: McpServerConfig[] = [];
   availableTools: McpTool[] = [];
 
@@ -677,7 +678,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
         modelSelection: mcpModelSelection,
         temperature: modelParams.temperature,
         seed: modelParams.seed !== -1 ? modelParams.seed : undefined,
-        enablePromptLogging: this.promptLogging.isLoggingActive()
+        enablePromptLogging: this.promptLogging.isLoggingActive(),
+        skipCriticPhase: this.skipCriticPhase
       };
 
       this.logger.debug('Multi-agent orchestration request parameters:', {

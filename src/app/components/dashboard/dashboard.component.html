@@ -311,14 +311,22 @@
           </label>
           
           <label class="mcp-checkbox" *ngIf="mcpEnabled">
-            <input 
-              type="checkbox" 
+            <input
+              type="checkbox"
               [(ngModel)]="multiAgentEnabled"
               (change)="onMultiAgentToggle()">
             <span class="checkmark"></span>
             Multi-Agent Orchestration
           </label>
-          
+
+          <label class="mcp-checkbox" *ngIf="mcpEnabled && multiAgentEnabled">
+            <input
+              type="checkbox"
+              [(ngModel)]="skipCriticPhase">
+            <span class="checkmark"></span>
+            Skip Critic Phase (End at Verifier)
+          </label>
+
           <div class="mcp-servers" *ngIf="mcpEnabled">
             <h4>MCP Servers ({{ getTotalEnabledTools() }} tools):</h4>
             <div class="server-list-compact">
