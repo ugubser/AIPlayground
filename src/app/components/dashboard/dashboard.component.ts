@@ -685,13 +685,20 @@ export class DashboardComponent implements OnInit, OnDestroy {
       const orchestrationResponse = await this.multiAgentOrchestrator.processQueryWithParams(orchestrationRequest);
 
       if (orchestrationResponse.success) {
-        // Replace the thinking message with the final answer
+        // Generate a unique message ID for this multi-agent response
+        const messageId = `multiagent_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+        
+        // Replace the thinking message with the final answer (with ID)
         const lastMessageIndex = this.generalMessages.length - 1;
         this.generalMessages[lastMessageIndex] = {
+          id: messageId,
           role: 'assistant',
           content: orchestrationResponse.finalAnswer,
           createdAt: new Date()
         };
+
+        // Update all multi-agent prompt logs to use this message ID
+        this.updateMultiAgentPromptLogs(messageId);
 
         // Add execution log to prompt logs if available for debugging
         if (orchestrationResponse.executionLog.length > 0) {
@@ -1180,6 +1187,27 @@ export class DashboardComponent implements OnInit, OnDestroy {
     } else {
       return `${prefix} ${content}`;
     }
+  }
+
+  /**
+   * Updates all recent multi-agent prompt logs to use the specified message ID
+   * This connects the multi-agent prompts to the final assistant message for display
+   */
+  private updateMultiAgentPromptLogs(messageId: string): void {
+    // Get recent multi-agent prompt logs (last 2 minutes to be safe)
+    const cutoffTime = new Date(Date.now() - 2 * 60 * 1000);
+    const recentMultiAgentLogs = this.promptLogs.filter(log => 
+      log.timestamp > cutoffTime &&
+      (log.sessionContext?.startsWith('multi-agent') || false)
+    );
+
+    // Update their message IDs to connect them to this assistant message
+    recentMultiAgentLogs.forEach(log => {
+      // Update the log entry in the prompt logging service
+      this.promptLogging.updatePromptLogMessageId(log.id, messageId);
+    });
+
+    console.log(`Updated ${recentMultiAgentLogs.length} multi-agent prompt logs with message ID: ${messageId}`);
   }
 
   ngOnDestroy() {

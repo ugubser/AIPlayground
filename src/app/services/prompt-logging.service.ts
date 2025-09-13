@@ -99,4 +99,12 @@ export class PromptLoggingService {
     const preview = lines.slice(0, maxLines).join('\n') + '...';
     return { preview, isTruncated: true };
   }
+
+  updatePromptLogMessageId(entryId: string, messageId: string): void {
+    const currentLogs = this.promptLogsSubject.value;
+    const updatedLogs = currentLogs.map(log => 
+      log.id === entryId ? { ...log, messageId: messageId } : log
+    );
+    this.promptLogsSubject.next(updatedLogs);
+  }
 }
