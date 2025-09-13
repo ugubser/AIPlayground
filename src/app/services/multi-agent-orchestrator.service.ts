@@ -337,10 +337,17 @@ export class MultiAgentOrchestratorService {
 
         // Log MCP prompt data if available
         if (result.mcpPromptData && Array.isArray(result.mcpPromptData)) {
+          console.log('🔧 Multi-Agent: Processing MCP prompt data:', {
+            taskId: task.id,
+            mcpDataCount: result.mcpPromptData.length,
+            messageId: messageId
+          });
+
           for (const mcpData of result.mcpPromptData) {
             const mcpMessageId = `multiagent_mcp_${task.id}_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
             if (mcpData.mcpRequest) {
+              console.log('🟢 Multi-Agent: Adding MCP Query log');
               this.promptLogging.addPromptLog({
                 type: 'request',
                 provider: 'MCP Server',
@@ -353,6 +360,7 @@ export class MultiAgentOrchestratorService {
             }
 
             if (mcpData.mcpResponse) {
+              console.log('🔵 Multi-Agent: Adding MCP Response log');
               this.promptLogging.addPromptLog({
                 type: 'response',
                 provider: 'MCP Server',
@@ -364,6 +372,8 @@ export class MultiAgentOrchestratorService {
               });
             }
           }
+        } else {
+          console.log('🚫 Multi-Agent: No MCP prompt data found for task:', task.id);
         }
       }
 

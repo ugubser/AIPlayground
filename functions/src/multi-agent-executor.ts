@@ -31,6 +31,7 @@ interface ExecutorResponse {
     llmRequest?: any;
     llmResponse?: any;
   };
+  mcpPromptData?: any[];
 }
 
 export const multiAgentExecutor = onRequest(
@@ -145,14 +146,15 @@ export const multiAgentExecutor = onRequest(
       // Execute with tools if available
       let result;
       let toolCalls: any[] = [];
+      let toolResponse: any = null;
 
       if (availableTools.length > 0) {
         if (isEmulator) {
           console.log('🛠️ Executing with tools...');
         }
-        
+
         // Use tool-enabled execution
-        const toolResponse = await getLLMResponseWithTools([
+        toolResponse = await getLLMResponseWithTools([
           {
             role: 'system',
             content: EXECUTOR_SYSTEM_PROMPT
@@ -211,6 +213,11 @@ export const multiAgentExecutor = onRequest(
         toolCalls,
         success: true
       };
+
+      // Add MCP prompt data if available (from tool execution)
+      if (availableTools.length > 0 && toolResponse && toolResponse.mcpPromptData) {
+        executorResponse.mcpPromptData = toolResponse.mcpPromptData;
+      }
 
       // Add prompt data if logging is enabled
       if (enablePromptLogging) {
