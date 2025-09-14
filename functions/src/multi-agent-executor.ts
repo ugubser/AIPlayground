@@ -408,13 +408,33 @@ export const multiAgentMultiTaskExecutor = onRequest(
         }
       ], actualModel, preFilteredTools, `multitask_${tasks.map(t => t.id).join('_')}`, temperature, seed, enablePromptLogging);
 
-      // Extract task results from tool calls - each tool call should map to a task
+      // Extract task results from tool calls - use structured response format
       const taskResults: Record<string, any> = {};
 
-      // Map tool call results back to tasks based on the tool calls made
-      if (toolResponse.toolCalls && toolResponse.toolCalls.length > 0) {
-        // For now, we'll assume the tool results are in the same order as tasks
-        // This is simplified - in reality we'd need smarter mapping
+      // The LLM should return structured results grouped by task ID
+      // Parse the structured response from the LLM content
+      if (toolResponse.content) {
+        try {
+          // Try to extract task-grouped results from the LLM's structured response
+          const structuredMatch = toolResponse.content.match(/```json\s*(\{[\s\S]*?\})\s*```/);
+          if (structuredMatch) {
+            const structuredResults = JSON.parse(structuredMatch[1]);
+
+            // If the LLM provided task-grouped results, use them
+            if (structuredResults.taskResults) {
+              Object.assign(taskResults, structuredResults.taskResults);
+            }
+          }
+        } catch (error: any) {
+          logger.warn('Could not parse structured response from LLM', {
+            error: error.message,
+            content: toolResponse.content.substring(0, 500)
+          });
+        }
+      }
+
+      // Fallback: if no structured results, map tool calls to tasks in order (original behavior)
+      if (Object.keys(taskResults).length === 0 && toolResponse.toolCalls && toolResponse.toolCalls.length > 0) {
         toolResponse.toolCalls.forEach((toolCall: any, index: number) => {
           if (index < tasks.length) {
             taskResults[tasks[index].id] = toolCall.result;
@@ -537,7 +557,24 @@ Remember: You are executing ONE specific task. Focus only on that task and provi
 
 const MULTI_TASK_EXECUTOR_SYSTEM_PROMPT = `You are a multi-agent task executor. Execute all the provided tasks using the available tools.
 
-Use the tools efficiently to complete all tasks. Call the required tools for each task as needed.`;
+CRITICAL: After executing all tool calls, you MUST provide a structured response that groups results by task ID. Use this exact format:
+
+\`\`\`json
+{
+  "taskResults": {
+    "task_1": {
+      "content": [{"type": "text", "text": "combined results for task_1"}]
+    },
+    "task_2": {
+      "content": [{"type": "text", "text": "combined results for task_2"}]
+    }
+  }
+}
+\`\`\`
+
+For each task, combine all relevant tool call results into a single comprehensive response. Group tool calls by the task they serve, not by individual tool calls.
+
+Execute all tasks using the available tools, then provide the structured response grouping results by task ID.`;
 
 function createExecutionPrompt(task: any): string {
   let prompt = `TASK TO EXECUTE:
@@ -600,7 +637,7 @@ function extractReasoningFromResult(result: string): string {
 
   // Try to extract reasoning from structured responses
   const lines = result.split('\n');
-  const reasoningLines = lines.filter(line => 
+  const reasoningLines = lines.filter(line =>
     line.toLowerCase().includes('reasoning') ||
     line.toLowerCase().includes('approach') ||
     line.toLowerCase().includes('strategy')
@@ -611,8 +648,8 @@ function extractReasoningFromResult(result: string): string {
   }
 
   // Fallback: return first meaningful line
-  const meaningfulLines = lines.filter(line => 
-    line.trim().length > 10 && 
+  const meaningfulLines = lines.filter(line =>
+    line.trim().length > 10 &&
     !line.includes('```')
   );
 
@@ -622,4 +659,5 @@ function extractReasoningFromResult(result: string): string {
 
   return 'Task completed successfully';
 }
+
 
