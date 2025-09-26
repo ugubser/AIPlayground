@@ -250,7 +250,8 @@ export class MathRenderingService {
       const svgWrapper = await mathJax.tex2svgPromise(expression, { display });
       const svgMarkup = this.extractSvgMarkup(svgWrapper);
       const normalizedSvg = svgMarkup.replace(/\s+/g, ' ').trim();
-      const dataUri = this.svgToDataUri(normalizedSvg);
+      const coloredSvg = this.applyMathColor(normalizedSvg);
+      const dataUri = this.svgToDataUri(coloredSvg);
       const altText = this.createAltText(expression);
 
       if (display) {
@@ -314,6 +315,22 @@ export class MathRenderingService {
       .replace(/\s+/g, ' ')
       .replace(/"/g, '&quot;')
       .trim();
+  }
+
+  private applyMathColor(svg: string): string {
+    const hasColorAttr = /\bcolor\s*=|\bcolor\s*:/.test(svg);
+    if (hasColorAttr) {
+      return svg;
+    }
+
+    const styleMatch = svg.match(/<svg[^>]*style=["']([^"']*)["']/i);
+    if (styleMatch) {
+      const existingStyle = styleMatch[1];
+      const updatedStyle = `color:#ffffff;${existingStyle}`;
+      return svg.replace(styleMatch[0], styleMatch[0].replace(existingStyle, updatedStyle));
+    }
+
+    return svg.replace('<svg', '<svg style="color:#ffffff;"');
   }
 
   private loadMathJax(): Promise<MathJaxInstance> {
