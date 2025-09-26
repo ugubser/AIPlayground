@@ -563,6 +563,10 @@ export class ChatService {
 
       // Log prompt data if enabled, using the consistent message ID
       if (this.promptLogging.isLoggingActive() && data.promptData) {
+        const isFollowUp = !!toolResults;
+        const requestSequence = isFollowUp ? 60 : 20;
+        const responseSequence = isFollowUp ? 70 : 30;
+
         if (data.promptData.llmRequest) {
           this.promptLogging.addPromptLog({
             type: 'request',
@@ -571,7 +575,10 @@ export class ChatService {
             content: data.promptData.llmRequest.content,
             timestamp: new Date(),
             sessionContext: 'mcp',
-            messageId: messageId
+            messageId: messageId,
+            metadata: {
+              sequence: requestSequence
+            }
           });
         }
         if (data.promptData.llmResponse) {
@@ -582,7 +589,10 @@ export class ChatService {
             content: data.promptData.llmResponse.content,
             timestamp: new Date(),
             sessionContext: 'mcp',
-            messageId: messageId
+            messageId: messageId,
+            metadata: {
+              sequence: responseSequence
+            }
           });
         }
       }
