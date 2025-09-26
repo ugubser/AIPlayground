@@ -7,6 +7,44 @@ import { FUNCTION_CONSTANTS } from './config/function-constants';
 const DEFAULT_MCP_MODEL = FUNCTION_CONSTANTS.DEFAULTS.MCP_MODEL;
 const isEmulator = process.env.FUNCTIONS_EMULATOR === 'true';
 
+const MULTI_TASK_RESPONSE_FORMAT = {
+  type: 'json_schema',
+  json_schema: {
+    name: 'multi_task_executor_response',
+    strict: true,
+    schema: {
+      type: 'object',
+      properties: {
+        taskResults: {
+          type: 'object',
+          additionalProperties: {
+            type: 'object',
+            properties: {
+              content: {
+                type: 'array',
+                minItems: 1,
+                items: {
+                  type: 'object',
+                  properties: {
+                    type: { type: 'string', enum: ['text'] },
+                    text: { type: 'string' }
+                  },
+                  required: ['type', 'text'],
+                  additionalProperties: false
+                }
+              }
+            },
+            required: ['content'],
+            additionalProperties: false
+          }
+        }
+      },
+      required: ['taskResults'],
+      additionalProperties: false
+    }
+  }
+};
+
 interface ExecutorRequest {
   task: {
     id: string;
@@ -410,6 +448,8 @@ export const multiAgentMultiTaskExecutor = onRequest(
       }
 
       // Execute with tools
+      const maxTokens = 4000;
+
       const toolResponse = await getLLMResponseWithTools([
         {
           role: 'system',
@@ -419,7 +459,10 @@ export const multiAgentMultiTaskExecutor = onRequest(
           role: 'user',
           content: executionPrompt
         }
-      ], actualModel, preFilteredTools, `multitask_${tasks.map(t => t.id).join('_')}`, temperature, seed, enablePromptLogging);
+      ], actualModel, preFilteredTools, `multitask_${tasks.map(t => t.id).join('_')}`, temperature, seed, enablePromptLogging, {
+        responseFormat: MULTI_TASK_RESPONSE_FORMAT,
+        maxTokens
+      });
 
       // Extract task results from tool calls - use structured response format
       const taskResults: Record<string, any> = {};
@@ -488,9 +531,10 @@ export const multiAgentMultiTaskExecutor = onRequest(
           model: actualModel,
           messages: messages,
           temperature: temperature !== undefined ? temperature : 0.7,
-          max_tokens: 4000,
+          max_tokens: maxTokens,
           tools: preFilteredTools,
-          tool_choice: 'auto'
+          tool_choice: 'auto',
+          response_format: MULTI_TASK_RESPONSE_FORMAT
         };
 
         if (seed !== undefined && seed !== -1) {
@@ -677,5 +721,4 @@ function extractReasoningFromResult(result: string): string {
 
   return 'Task completed successfully';
 }
-
 

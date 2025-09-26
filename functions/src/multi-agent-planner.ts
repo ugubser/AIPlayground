@@ -7,6 +7,47 @@ import { FUNCTION_CONSTANTS } from './config/function-constants';
 const DEFAULT_MCP_MODEL = FUNCTION_CONSTANTS.DEFAULTS.MCP_MODEL;
 const isEmulator = process.env.FUNCTIONS_EMULATOR === 'true';
 
+const PLANNER_RESPONSE_FORMAT = {
+  type: 'json_schema',
+  json_schema: {
+    name: 'multi_agent_plan',
+    strict: true,
+    schema: {
+      type: 'object',
+      properties: {
+        reasoning: { type: 'string' },
+        totalSteps: { type: 'integer', minimum: 1 },
+        tasks: {
+          type: 'array',
+          minItems: 1,
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              description: { type: 'string' },
+              dependencies: {
+                type: 'array',
+                items: { type: 'string' },
+                default: []
+              },
+              tools: {
+                type: 'array',
+                items: { type: 'string' },
+                default: []
+              },
+              reasoning: { type: 'string' }
+            },
+            required: ['id', 'description', 'dependencies', 'tools'],
+            additionalProperties: false
+          }
+        }
+      },
+      required: ['reasoning', 'tasks', 'totalSteps'],
+      additionalProperties: false
+    }
+  }
+};
+
 interface PlannerRequest {
   query: string;
   availableTools: {
@@ -111,6 +152,8 @@ export const multiAgentPlanner = onRequest(
       }
 
       // Get response from LLM
+      const maxTokens = 4000;
+
       const llmResponse = await getLLMResponse([
         {
           role: 'system',
@@ -120,7 +163,10 @@ export const multiAgentPlanner = onRequest(
           role: 'user',
           content: planningPrompt
         }
-      ], actualModel, temperature, seed);
+      ], actualModel, temperature, seed, {
+        responseFormat: PLANNER_RESPONSE_FORMAT,
+        maxTokens
+      });
 
       logger.info('LLM planning response received', { 
         responseLength: llmResponse.length 
@@ -164,7 +210,8 @@ export const multiAgentPlanner = onRequest(
             }
           ],
           temperature: temperature !== undefined ? temperature : 0.7,
-          max_tokens: 4000
+          max_tokens: maxTokens,
+          response_format: PLANNER_RESPONSE_FORMAT
         };
 
         if (seed !== undefined && seed !== -1) {

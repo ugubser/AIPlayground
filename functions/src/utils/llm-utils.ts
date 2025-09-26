@@ -49,13 +49,21 @@ export interface ToolCallResponse {
 
 const isEmulator = process.env.FUNCTIONS_EMULATOR === 'true';
 
+interface LlmResponseOptions {
+  responseFormat?: any;
+  maxTokens?: number;
+}
+
 export async function getLLMResponse(
   messages: ChatMessage[], 
   model?: string,
   temperature?: number,
-  seed?: number
+  seed?: number,
+  options?: LlmResponseOptions
 ): Promise<string> {
-  
+
+  const opts = options || {};
+
   const actualLlmModel = model || 'meta-llama/llama-4-maverick:free';
   const actualLlmProvider = 'openrouter.ai'; // Default for multi-agent system
   
@@ -89,12 +97,16 @@ export async function getLLMResponse(
     model: actualLlmModel,
     messages,
     temperature: temperature !== undefined ? temperature : 0.7,
-    max_tokens: 4000
+    max_tokens: opts.maxTokens !== undefined ? opts.maxTokens : 4000
   };
 
   // Add seed if provided (omit if -1 or undefined to let provider randomize)
   if (seed !== undefined && seed !== -1) {
     llmRequestBody.seed = seed;
+  }
+
+  if (opts.responseFormat) {
+    llmRequestBody.response_format = opts.responseFormat;
   }
 
   logger.info('LLM Request', { 
@@ -111,6 +123,7 @@ export async function getLLMResponse(
       messageCount: messages.length,
       temperature: llmRequestBody.temperature,
       seed: llmRequestBody.seed,
+      responseFormat: opts.responseFormat ? opts.responseFormat.json_schema?.name || 'custom_schema' : 'default',
       messages: messages.map(m => ({
         role: m.role,
         contentLength: m.content.length
@@ -159,9 +172,11 @@ export async function getLLMResponseWithTools(
   taskId?: string,
   temperature?: number,
   seed?: number,
-  enablePromptLogging?: boolean
+  enablePromptLogging?: boolean,
+  options?: LlmResponseOptions
 ): Promise<ToolCallResponse> {
-  
+  const opts = options || {};
+
   const actualLlmModel = model || 'meta-llama/llama-4-maverick:free';
   const actualLlmProvider = 'openrouter.ai';
   
@@ -194,7 +209,7 @@ export async function getLLMResponseWithTools(
     model: actualLlmModel,
     messages,
     temperature: temperature !== undefined ? temperature : 0.7,
-    max_tokens: 4000
+    max_tokens: opts.maxTokens !== undefined ? opts.maxTokens : 4000
   };
 
   // Add seed if provided (omit if -1 or undefined to let provider randomize)
@@ -206,6 +221,10 @@ export async function getLLMResponseWithTools(
   if (tools && tools.length > 0) {
     llmRequestBody.tools = tools;
     llmRequestBody.tool_choice = 'auto';
+  }
+
+  if (opts.responseFormat) {
+    llmRequestBody.response_format = opts.responseFormat;
   }
 
   logger.info('LLM Request with tools', { 
@@ -227,6 +246,7 @@ export async function getLLMResponseWithTools(
       toolCount: tools?.length || 0,
       hasTools: !!(tools && tools.length > 0),
       taskId,
+      responseFormat: opts.responseFormat ? opts.responseFormat.json_schema?.name || 'custom_schema' : 'default',
       tools: tools?.map(t => ({
         name: t.function.name,
         description: t.function.description.substring(0, 100) + '...'

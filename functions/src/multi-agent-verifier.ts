@@ -7,6 +7,49 @@ import { FUNCTION_CONSTANTS } from './config/function-constants';
 const DEFAULT_MCP_MODEL = FUNCTION_CONSTANTS.DEFAULTS.MCP_MODEL;
 const isEmulator = process.env.FUNCTIONS_EMULATOR === 'true';
 
+const VERIFIER_RESPONSE_FORMAT = {
+  type: 'json_schema',
+  json_schema: {
+    name: 'multi_agent_verification',
+    strict: true,
+    schema: {
+      type: 'object',
+      properties: {
+        overallCorrect: { type: 'boolean' },
+        confidence: { type: 'integer', minimum: 0, maximum: 100 },
+        reasoning: { type: 'string' },
+        taskVerifications: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              taskId: { type: 'string' },
+              isCorrect: { type: 'boolean' },
+              reasoning: { type: 'string' },
+              confidence: { type: 'integer', minimum: 0, maximum: 100 },
+              issues: {
+                type: 'array',
+                items: { type: 'string' },
+                default: []
+              }
+            },
+            required: ['taskId', 'isCorrect', 'reasoning', 'confidence'],
+            additionalProperties: false
+          }
+        },
+        finalAnswer: { type: 'string' },
+        recommendations: {
+          type: 'array',
+          items: { type: 'string' },
+          default: []
+        }
+      },
+      required: ['overallCorrect', 'confidence', 'reasoning', 'taskVerifications', 'finalAnswer'],
+      additionalProperties: false
+    }
+  }
+};
+
 interface VerifierRequest {
   originalQuery: string;
   tasks: {
@@ -114,6 +157,8 @@ export const multiAgentVerifier = onRequest(
       const verificationPrompt = createVerificationPrompt(originalQuery, tasks);
 
       // Get response from LLM
+      const maxTokens = 4000;
+
       const llmResponse = await getLLMResponse([
         {
           role: 'system',
@@ -123,7 +168,10 @@ export const multiAgentVerifier = onRequest(
           role: 'user',
           content: verificationPrompt
         }
-      ], actualModel, temperature, seed);
+      ], actualModel, temperature, seed, {
+        responseFormat: VERIFIER_RESPONSE_FORMAT,
+        maxTokens
+      });
 
       logger.info('LLM verification response received', { 
         responseLength: llmResponse.length 
@@ -151,7 +199,8 @@ export const multiAgentVerifier = onRequest(
             }
           ],
           temperature: temperature !== undefined ? temperature : 0.7,
-          max_tokens: 4000
+          max_tokens: maxTokens,
+          response_format: VERIFIER_RESPONSE_FORMAT
         };
 
         if (seed !== undefined && seed !== -1) {
