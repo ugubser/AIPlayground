@@ -873,6 +873,34 @@ export const mcpChat = functions
     const actualLlmProvider = llmProvider || defaults?.llm?.provider || FUNCTION_CONSTANTS.DEFAULTS.LLM_PROVIDER;
     const actualLlmModel = llmModel || defaults?.llm?.model || FUNCTION_CONSTANTS.DEFAULTS.MCP_MODEL;
 
+    const MCP_RESPONSE_FORMAT = {
+      type: 'json_schema',
+      json_schema: {
+        name: 'mcp_tool_decision',
+        strict: false,
+        schema: {
+          type: 'object',
+          properties: {
+            rationale: { type: 'string' },
+            actions: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  tool: { type: 'string' },
+                  arguments: { type: 'object' }
+                },
+                required: ['tool', 'arguments'],
+                additionalProperties: true
+              }
+            }
+          },
+          required: ['actions'],
+          additionalProperties: true
+        }
+      }
+    };
+
     console.log('MCP Chat request:', { 
       actualLlmProvider, 
       actualLlmModel, 
@@ -931,7 +959,7 @@ export const mcpChat = functions
       // Prepare request body
       const llmRequestBody: any = {
         model: actualLlmModel,
-        messages: messages,
+        messages,
         temperature: temperature !== undefined ? temperature : FUNCTION_CONSTANTS.LLM_CONFIG.CHAT_TEMPERATURE,
         max_tokens: FUNCTION_CONSTANTS.LLM_CONFIG.CHAT_MAX_TOKENS
       };
@@ -941,29 +969,18 @@ export const mcpChat = functions
         llmRequestBody.seed = seed;
       }
 
-      // Add tools for supported providers (only on initial request)
+      // Add tools and response format on initial request
       if (tools && tools.length > 0 && !toolResults) {
-        if (actualLlmProvider === 'openrouter.ai') {
-          llmRequestBody.tools = tools.map((tool: any) => ({
-            type: 'function',
-            function: {
-              name: tool.name,
-              description: tool.description,
-              parameters: tool.inputSchema
-            }
-          }));
-          llmRequestBody.tool_choice = 'auto';
-        } else if (actualLlmProvider === 'together.ai') {
-          llmRequestBody.tools = tools.map((tool: any) => ({
-            type: 'function',
-            function: {
-              name: tool.name,
-              description: tool.description,
-              parameters: tool.inputSchema
-            }
-          }));
-          llmRequestBody.tool_choice = 'auto';
-        }
+        llmRequestBody.tools = tools.map((tool: any) => ({
+          type: 'function',
+          function: {
+            name: tool.name,
+            description: tool.description,
+            parameters: tool.inputSchema
+          }
+        }));
+        llmRequestBody.tool_choice = 'auto';
+        llmRequestBody.response_format = MCP_RESPONSE_FORMAT;
       }
 
       const llmHeaders = modelsConfigService.getProviderHeaders(actualLlmProvider, llmKey, 'chat');
@@ -976,7 +993,8 @@ export const mcpChat = functions
           hasTools: !!tools?.length && !toolResults,
           toolCount: tools?.length || 0,
           messageCount: messages.length,
-          isFollowUp: !!toolResults
+          isFollowUp: !!toolResults,
+          responseFormat: llmRequestBody.response_format ? llmRequestBody.response_format.json_schema?.name : 'default'
         }, null, 2));
       }
 
@@ -999,19 +1017,40 @@ export const mcpChat = functions
       }
 
       const message_content = choice.message;
-      
-      // Check if LLM wants to use tools (only on initial request)
-      if (!toolResults && message_content.tool_calls && message_content.tool_calls.length > 0) {
-        const toolCalls = message_content.tool_calls.map((tc: any) => ({
-          name: tc.function.name,
-          arguments: typeof tc.function.arguments === 'string' 
-            ? JSON.parse(tc.function.arguments) 
-            : tc.function.arguments
-        }));
 
+      let structuredDecision: { rationale?: string; actions?: Array<{ tool: string; arguments?: Record<string, any> }> } | null = null;
+      if (!toolResults && llmRequestBody.response_format && typeof message_content.content === 'string') {
+        try {
+          const parsed = JSON.parse(message_content.content);
+          if (parsed && Array.isArray(parsed.actions) && parsed.actions.length > 0) {
+            structuredDecision = parsed;
+          }
+        } catch (err) {
+          console.warn('Failed to parse structured MCP decision', err);
+        }
+      }
+
+      const toolCallsFromMessage = message_content.tool_calls?.map((tc: any) => ({
+        name: tc.function.name,
+        arguments: typeof tc.function.arguments === 'string'
+          ? JSON.parse(tc.function.arguments)
+          : tc.function.arguments
+      })) || [];
+
+      const toolCalls = structuredDecision
+        ? structuredDecision.actions!.map(action => ({
+            name: action.tool,
+            arguments: action.arguments || {}
+          }))
+        : toolCallsFromMessage;
+
+      // Check if LLM wants to use tools (only on initial request)
+      if (!toolResults && toolCalls.length > 0) {
         const result: any = {
-          answer: message_content.content || 'I need to use some tools to answer your question.',
-          toolCalls: toolCalls
+          answer: structuredDecision?.rationale
+            || message_content.content
+            || 'I need to use some tools to answer your question.',
+          toolCalls
         };
 
         if (enablePromptLogging) {
