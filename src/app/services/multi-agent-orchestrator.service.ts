@@ -201,6 +201,12 @@ export class MultiAgentOrchestratorService {
       executionOrder: 0 // Will be set by dependency manager
     }));
 
+    console.log('🗂️ Planner generated tasks:', tasks.map(t => ({
+      id: t.id,
+      description: t.description.substring(0, 20) + '...',
+      dependencies: t.dependencies,
+      tools: t.tools
+    }))); 
     // Use dependency manager to create execution order
     const orderedPlan = this.taskManager.createExecutionPlan(tasks);
     
@@ -403,6 +409,36 @@ export class MultiAgentOrchestratorService {
           }
         } else {
           console.log('🚫 Multi-Agent: No MCP prompt data found for task:', task.id);
+        }
+
+        // Log follow-up prompt data if available
+        if (result.followUpPromptData) {
+          console.log('🔄 Multi-Agent: Processing follow-up prompt data:', {
+            taskId: task.id,
+            messageId: messageId
+          });
+
+          this.promptLogging.addPromptLog({
+            type: 'request',
+            provider: result.followUpPromptData.llmRequest.provider,
+            model: result.followUpPromptData.llmRequest.model,
+            content: result.followUpPromptData.llmRequest.content,
+            timestamp: new Date(),
+            sessionContext: `multi-agent-followup-${task.id}`,
+            messageId: messageId + '_followup'
+          });
+
+          this.promptLogging.addPromptLog({
+            type: 'response',
+            provider: result.followUpPromptData.llmResponse.provider,
+            model: result.followUpPromptData.llmResponse.model,
+            content: result.followUpPromptData.llmResponse.content,
+            timestamp: new Date(),
+            sessionContext: `multi-agent-followup-${task.id}`,
+            messageId: messageId + '_followup'
+          });
+        } else {
+          console.log('🚫 Multi-Agent: No follow-up prompt data found for task:', task.id);
         }
       }
 

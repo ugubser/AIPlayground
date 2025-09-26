@@ -8,19 +8,21 @@ import { PromptLogEntry, PromptLoggingService } from '../../services/prompt-logg
   imports: [CommonModule],
   template: `
     <div class="prompt-message"
-         [class.request]="entry.type === 'request' && !isMcpQuery && !isMcpResponse"
-         [class.response]="entry.type === 'response' && !isMcpQuery && !isMcpResponse"
+         [class.request]="entry.type === 'request' && !isMcpQuery && !isMcpResponse && !isFollowUp"
+         [class.response]="entry.type === 'response' && !isMcpQuery && !isMcpResponse && !isFollowUp"
          [class.search-results]="isSearchResults"
          [class.mcp-query]="isMcpQuery"
-         [class.mcp-response]="isMcpResponse">
+         [class.mcp-response]="isMcpResponse"
+         [class.followup-request]="isFollowUp && entry.type === 'request'"
+         [class.followup-response]="isFollowUp && entry.type === 'response'">
       <div class="prompt-header">
         <span class="prompt-label">
           {{ entry.type === 'request' ? '📤' : '📥' }}
-          {{ entry.type | titlecase }} - {{ entry.provider }}{{ entry.model ? '/' + entry.model : '' }}
+          {{ isFollowUp ? '🔄 Follow-up ' : '' }}{{ entry.type | titlecase }} - {{ entry.provider }}{{ entry.model ? '/' + entry.model : '' }}
         </span>
         <span class="prompt-timestamp">{{ entry.timestamp.toLocaleTimeString() }}</span>
       </div>
-      
+
       <div class="prompt-content" (click)="toggleExpanded()">
         <pre class="prompt-text" [class.expanded]="entry.expanded">{{ displayContent }}</pre>
         <div class="prompt-expand-hint" *ngIf="isTruncated && !entry.expanded">
@@ -165,6 +167,40 @@ import { PromptLogEntry, PromptLoggingService } from '../../services/prompt-logg
     .prompt-message.mcp-response:hover {
       background-color: rgba(23, 162, 184, 0.08) !important;
     }
+
+    .prompt-message.followup-request {
+      border-color: #6f42c1 !important;
+      background-color: rgba(111, 66, 193, 0.05) !important;
+    }
+
+    .prompt-message.followup-request .prompt-label {
+      color: #6f42c1 !important;
+    }
+
+    .prompt-message.followup-request .prompt-text {
+      color: #6f42c1 !important;
+    }
+
+    .prompt-message.followup-request:hover {
+      background-color: rgba(111, 66, 193, 0.08) !important;
+    }
+
+    .prompt-message.followup-response {
+      border-color: #e83e8c !important;
+      background-color: rgba(232, 62, 140, 0.05) !important;
+    }
+
+    .prompt-message.followup-response .prompt-label {
+      color: #e83e8c !important;
+    }
+
+    .prompt-message.followup-response .prompt-text {
+      color: #e83e8c !important;
+    }
+
+    .prompt-message.followup-response:hover {
+      background-color: rgba(232, 62, 140, 0.08) !important;
+    }
   `]
 })
 export class PromptMessageComponent {
@@ -194,6 +230,10 @@ export class PromptMessageComponent {
 
   get isMcpResponse(): boolean {
     return this.entry.sessionContext === 'mcp-tool-call' && this.entry.type === 'response';
+  }
+
+  get isFollowUp(): boolean {
+    return this.entry.sessionContext?.startsWith('multi-agent-followup-') || false;
   }
 
   toggleExpanded(): void {

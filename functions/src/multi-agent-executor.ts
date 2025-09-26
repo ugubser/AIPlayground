@@ -46,6 +46,10 @@ interface ExecutorResponse {
     llmResponse?: any;
   };
   mcpPromptData?: any[];
+  followUpPromptData?: {
+    llmRequest: any;
+    llmResponse: any;
+  };
 }
 
 interface MultiTaskExecutorResponse {
@@ -57,6 +61,10 @@ interface MultiTaskExecutorResponse {
     llmResponse?: any;
   };
   mcpPromptData?: any[];
+  followUpPromptData?: {
+    llmRequest: any;
+    llmResponse: any;
+  };
 }
 
 export const multiAgentExecutor = onRequest(
@@ -242,6 +250,11 @@ export const multiAgentExecutor = onRequest(
       // Add MCP prompt data if available (from tool execution)
       if (availableTools.length > 0 && toolResponse && toolResponse.mcpPromptData) {
         executorResponse.mcpPromptData = toolResponse.mcpPromptData;
+      }
+
+      // Add follow-up prompt data if available (from follow-up LLM call after tool execution)
+      if (availableTools.length > 0 && toolResponse && toolResponse.followUpPromptData) {
+        executorResponse.followUpPromptData = toolResponse.followUpPromptData;
       }
 
       // Add prompt data if logging is enabled
@@ -451,6 +464,11 @@ export const multiAgentMultiTaskExecutor = onRequest(
       // Add MCP prompt data if available
       if (toolResponse.mcpPromptData) {
         response.mcpPromptData = toolResponse.mcpPromptData;
+      }
+
+      // Add follow-up prompt data if available
+      if (toolResponse.followUpPromptData) {
+        response.followUpPromptData = toolResponse.followUpPromptData;
       }
 
       // Add prompt data if logging is enabled

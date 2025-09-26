@@ -41,6 +41,10 @@ export interface ToolCallResponse {
   content: string;
   toolCalls: any[];
   mcpPromptData?: any[];
+  followUpPromptData?: {
+    llmRequest: any;
+    llmResponse: any;
+  };
 }
 
 const isEmulator = process.env.FUNCTIONS_EMULATOR === 'true';
@@ -316,17 +320,46 @@ export async function getLLMResponseWithTools(
       }))
     ];
 
-    const followUpResponse = await getLLMResponse(followUpMessages, model);
+    const followUpResponse = await getLLMResponse(followUpMessages, model, temperature, seed);
 
     // Extract MCP prompt data from tool results
     const mcpPromptData = toolResults
       .filter(tr => tr.promptData)
       .map(tr => tr.promptData);
 
+    // Create follow-up prompt data if logging enabled
+    let followUpPromptData = undefined;
+    if (enablePromptLogging) {
+      const followUpRequestBody: any = {
+        model: actualLlmModel,
+        messages: followUpMessages,
+        temperature: temperature !== undefined ? temperature : 0.7,
+        max_tokens: 4000
+      };
+
+      if (seed !== undefined && seed !== -1) {
+        followUpRequestBody.seed = seed;
+      }
+
+      followUpPromptData = {
+        llmRequest: {
+          provider: actualLlmProvider,
+          model: actualLlmModel,
+          content: JSON.stringify(followUpRequestBody, null, 2)
+        },
+        llmResponse: {
+          provider: actualLlmProvider,
+          model: actualLlmModel,
+          content: JSON.stringify({ content: followUpResponse }, null, 2)
+        }
+      };
+    }
+
     return {
       content: followUpResponse,
       toolCalls: toolResults,
-      mcpPromptData: mcpPromptData.length > 0 ? mcpPromptData : undefined
+      mcpPromptData: mcpPromptData.length > 0 ? mcpPromptData : undefined,
+      followUpPromptData
     };
   }
 
