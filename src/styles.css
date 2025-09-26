@@ -150,6 +150,21 @@ body {
   vertical-align: middle;
 }
 
+.svg-embedded-block {
+  display: flex;
+  justify-content: center;
+  margin: 1.5rem 0;
+}
+
+.svg-embedded-image {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25);
+}
+
 /* Typography Scale */
 h1, h2, h3, h4, h5, h6 {
   margin: 0 0 var(--space-4) 0;

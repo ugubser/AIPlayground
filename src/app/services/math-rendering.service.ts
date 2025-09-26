@@ -24,11 +24,16 @@ export class MathRenderingService {
       return markdown ?? '';
     }
 
-    if (!this.containsMath(markdown)) {
+    const hasMath = this.containsMath(markdown);
+    const hasSvg = this.containsSvg(markdown);
+
+    if (!hasMath && !hasSvg) {
       return markdown;
     }
 
-    const segments = this.extractSegments(markdown);
+    let workingContent = hasSvg ? this.convertSvgCodeFences(markdown) : markdown;
+
+    const segments = this.extractSegments(workingContent);
     if (!segments.some(segment => segment.type === 'math')) {
       return markdown;
     }
@@ -38,7 +43,9 @@ export class MathRenderingService {
 
     for (const segment of segments) {
       if (segment.type === 'text') {
-        renderedParts.push(segment.content);
+        let processed = this.convertSvgCodeFences(segment.content);
+        processed = this.convertInlineSvgs(processed);
+        renderedParts.push(processed);
         continue;
       }
 
@@ -56,8 +63,60 @@ export class MathRenderingService {
     return renderedParts.join('');
   }
 
+  private convertInlineSvgs(input: string): string {
+    const svgRegex = /(?:<\?xml[^>]*\?>\s*)?<svg[\s\S]*?<\/svg>/gi;
+
+    return input.replace(svgRegex, match => {
+      const svgContent = match.replace(/^[^<]*<\?xml[^>]*\?>\s*/i, '').trim();
+
+      if (!svgContent.startsWith('<svg')) {
+        return match;
+      }
+
+      try {
+        const dataUri = this.svgToDataUri(svgContent);
+        const titleMatch = svgContent.match(/<title>([\s\S]*?)<\/title>/i);
+        const alt = this.createAltText(titleMatch ? titleMatch[1] : 'Generated SVG graphic');
+        return `\n<div class="svg-embedded-block"><img class="svg-embedded-image" src="${dataUri}" alt="${alt}"></div>\n`;
+      } catch (error) {
+        console.warn('Failed to embed inline SVG, leaving original markup', { error });
+        return match;
+      }
+    });
+  }
+
+  private convertSvgCodeFences(input: string): string {
+    const fenceRegex = /```svg\s+([\s\S]*?)```/gi;
+
+    return input.replace(fenceRegex, (match, rawContent) => {
+      const trimmed = rawContent.trim();
+      if (!trimmed) {
+        return match;
+      }
+
+      const svgContent = trimmed.replace(/^[^<]*<\?xml[^>]*\?>\s*/i, '');
+      if (!svgContent.trim().toLowerCase().startsWith('<svg')) {
+        return match;
+      }
+
+      try {
+        const dataUri = this.svgToDataUri(svgContent.trim());
+        const titleMatch = svgContent.match(/<title>([\s\S]*?)<\/title>/i);
+        const alt = this.createAltText(titleMatch ? titleMatch[1] : 'Generated SVG graphic');
+        return `\n<div class="svg-embedded-block"><img class="svg-embedded-image" src="${dataUri}" alt="${alt}"></div>\n`;
+      } catch (error) {
+        console.warn('Failed to embed SVG code fence, leaving original content', { error });
+        return match;
+      }
+    });
+  }
+
   private containsMath(input: string): boolean {
     return /\$\$|\\\[|\\\(|\$(?=\S)/.test(input);
+  }
+
+  private containsSvg(input: string): boolean {
+    return /```svg|<svg[\s>]/i.test(input);
   }
 
   private extractSegments(input: string): MathSegment[] {
@@ -211,11 +270,25 @@ export class MathRenderingService {
     const global = typeof window !== 'undefined' ? (window as any) : undefined;
     const adaptor = global?.MathJax?.startup?.adaptor;
 
-    if (adaptor && typeof adaptor.outerHTML === 'function') {
-      return adaptor.outerHTML(svgWrapper);
+    if (adaptor) {
+      try {
+        const firstChild = adaptor.firstChild(svgWrapper);
+        if (firstChild && adaptor.kind(firstChild) === 'svg') {
+          return adaptor.outerHTML(firstChild);
+        }
+      } catch (error) {
+        console.warn('MathJax adaptor failed to extract SVG element', error);
+      }
     }
 
-    if (svgWrapper && typeof svgWrapper.outerHTML === 'string') {
+    if (svgWrapper?.querySelector) {
+      const svgElement = svgWrapper.querySelector('svg');
+      if (svgElement) {
+        return svgElement.outerHTML;
+      }
+    }
+
+    if (svgWrapper && typeof svgWrapper.outerHTML === 'string' && svgWrapper.outerHTML.trim().startsWith('<svg')) {
       return svgWrapper.outerHTML;
     }
 
