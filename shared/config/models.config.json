@@ -36,16 +36,10 @@
   "rag": {
     "LLM": {
       "openrouter.ai": [
-        "meta-llama/llama-4-maverick:free",
         "meta-llama/llama-4-maverick",
-        "z-ai/glm-4.5-air:free",
         "z-ai/glm-4.5-air",
-        "qwen/qwen3-coder:free",
         "qwen/qwen3-coder",
-        "moonshotai/kimi-k2:free",
         "moonshotai/kimi-k2",
-        "google/gemma-3n-e2b-it:free",
-        "openai/gpt-oss-20b:free",
         "openai/gpt-oss-20b",
         "qwen/qwen3-30b-a3b-thinking-2507",
         "x-ai/grok-code-fast-1",
@@ -79,16 +73,15 @@
   "chat": {
     "LLM": {
       "openrouter.ai": [
-        "meta-llama/llama-4-maverick:free",
         "meta-llama/llama-4-maverick",
-        "z-ai/glm-4.5-air:free",
+
         "z-ai/glm-4.5-air",
-        "qwen/qwen3-coder:free",
+
         "qwen/qwen3-coder",
-        "moonshotai/kimi-k2:free",
+
         "moonshotai/kimi-k2",
-        "google/gemma-3n-e2b-it:free",
-        "openai/gpt-oss-20b:free",
+
+
         "openai/gpt-oss-20b",
         "qwen/qwen3-30b-a3b-thinking-2507",
         "x-ai/grok-code-fast-1",
@@ -110,12 +103,10 @@
     },
     "MCP": {
       "openrouter.ai": [
-        "moonshotai/kimi-k2:free",
+      
         "moonshotai/kimi-k2",
-        "meta-llama/llama-4-maverick:free",
         "meta-llama/llama-4-maverick",
         "mistralai/mistral-medium-3.1",
-        "deepseek/deepseek-chat-v3.1:free",
         "deepseek/deepseek-chat-v3.1",
         "qwen/qwen3-coder:free",
         "qwen/qwen3-coder",
@@ -133,12 +124,10 @@
   "vision": {
     "VISION": {
       "openrouter.ai": [
-        "google/gemini-2.5-flash-image-preview:free",
-        "moonshotai/kimi-vl-a3b-thinking:free",
+        "google/gemini-2.5-flash-preview-09-2025",
+        "moonshotai/kimi-vl-a3b-thinking",
         "moonshotai/kimi-k2",
-        "meta-llama/llama-4-maverick:free",
         "meta-llama/llama-4-maverick",
-        "google/gemma-3-4b-it:free",
         "openai/gpt-4o",
         "anthropic/claude-3.5-sonnet",
         "google/gemini-2.0-flash-exp",
