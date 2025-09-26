@@ -65,9 +65,15 @@ export class MultiAgentOrchestratorService {
     model?: string;
     status?: 'pending' | 'completed' | 'error';
     metadata?: Record<string, any>;
+    sequence?: number;
   }): string {
     if (!this.promptLogging.isLoggingActive()) {
       return '';
+    }
+
+    const metadata = { ...(options.metadata || {}) };
+    if (options.sequence !== undefined) {
+      metadata['sequence'] = options.sequence;
     }
 
     return this.promptLogging.addPromptLog({
@@ -79,7 +85,7 @@ export class MultiAgentOrchestratorService {
       sessionContext: options.sessionContext,
       status: options.status,
       title: options.title,
-      metadata: options.metadata
+      metadata
     });
   }
 
@@ -190,7 +196,8 @@ export class MultiAgentOrchestratorService {
       status: 'pending',
       metadata: {
         phase: 'planning'
-      }
+      },
+      sequence: 10
     });
 
     // Log to prompt logging if enabled
@@ -229,25 +236,6 @@ export class MultiAgentOrchestratorService {
       status: 'completed'
     });
 
-    this.logPhaseEvent({
-      type: 'response',
-      title: 'Planning Response',
-      content: JSON.stringify({
-        taskCount: plannerResponse.tasks?.length || 0,
-        totalSteps: plannerResponse.totalSteps,
-        reasoning: plannerResponse.reasoning,
-        tasks: plannerResponse.tasks
-      }, null, 2),
-      sessionContext: 'multi-agent-planner',
-      provider: 'Multi-Agent Planner',
-      model: plannerModel,
-      status: 'completed',
-      metadata: {
-        phase: 'planning',
-        taskCount: plannerResponse.tasks?.length || 0
-      }
-    });
-    
     // Log prompt data if available and enabled
     if (plannerResponse.promptData && (enablePromptLogging !== undefined ? enablePromptLogging : this.promptLogging.isLoggingActive())) {
       const messageId = `multiagent_planner_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
@@ -264,7 +252,8 @@ export class MultiAgentOrchestratorService {
           status: 'completed',
           title: 'Planning LLM Request',
           metadata: {
-            phase: 'planning'
+            phase: 'planning',
+            sequence: 20
           }
         });
       }
@@ -281,11 +270,32 @@ export class MultiAgentOrchestratorService {
           status: 'completed',
           title: 'Planning LLM Response',
           metadata: {
-            phase: 'planning'
+            phase: 'planning',
+            sequence: 30
           }
         });
       }
     }
+    
+    this.logPhaseEvent({
+      type: 'response',
+      title: 'Planning Response',
+      content: JSON.stringify({
+        taskCount: plannerResponse.tasks?.length || 0,
+        totalSteps: plannerResponse.totalSteps,
+        reasoning: plannerResponse.reasoning,
+        tasks: plannerResponse.tasks
+      }, null, 2),
+      sessionContext: 'multi-agent-planner',
+      provider: 'Multi-Agent Planner',
+      model: plannerModel,
+      status: 'completed',
+      metadata: {
+        phase: 'planning',
+        taskCount: plannerResponse.tasks?.length || 0
+      },
+      sequence: 40
+    });
     
     // Convert planner response to execution plan
     const tasks: Task[] = plannerResponse.tasks.map((task: any, index: number) => ({
@@ -444,7 +454,8 @@ export class MultiAgentOrchestratorService {
         metadata: {
           phase: 'execution',
           taskId: task.id
-        }
+        },
+        sequence: 10
       });
 
       // Log to prompt logging if enabled
@@ -485,21 +496,6 @@ export class MultiAgentOrchestratorService {
           status: 'completed'
         });
       }
-
-      this.logPhaseEvent({
-        type: 'response',
-        title: `Task ${task.id} Execution Response`,
-        content: JSON.stringify(result, null, 2),
-        sessionContext: `multi-agent-executor-${task.id}`,
-        provider: 'Task Executor',
-        model: executorModel,
-        status: 'completed',
-        metadata: {
-          phase: 'execution',
-          taskId: task.id
-        }
-      });
-      this.logger.logTaskComplete(task, result);
       
       // Log prompt data if available and enabled
       if (result.promptData && (enablePromptLogging !== undefined ? enablePromptLogging : this.promptLogging.isLoggingActive())) {
@@ -518,7 +514,8 @@ export class MultiAgentOrchestratorService {
             title: `Task ${task.id} LLM Request`,
             metadata: {
               phase: 'execution',
-              taskId: task.id
+              taskId: task.id,
+              sequence: 20
             }
           });
         }
@@ -536,7 +533,8 @@ export class MultiAgentOrchestratorService {
             title: `Task ${task.id} LLM Response`,
             metadata: {
               phase: 'execution',
-              taskId: task.id
+              taskId: task.id,
+              sequence: 30
             }
           });
         }
@@ -564,7 +562,8 @@ export class MultiAgentOrchestratorService {
                 title: `Tool Call Request · ${mcpData.mcpRequest.toolName}`,
                 metadata: {
                   phase: 'execution',
-                  taskId: task.id
+                  taskId: task.id,
+                  sequence: 25
                 }
               });
             }
@@ -583,7 +582,8 @@ export class MultiAgentOrchestratorService {
                 title: `Tool Call Response · ${mcpData.mcpRequest?.toolName || 'MCP Tool'}`,
                 metadata: {
                   phase: 'execution',
-                  taskId: task.id
+                  taskId: task.id,
+                  sequence: 35
                 }
               });
             }
@@ -592,48 +592,28 @@ export class MultiAgentOrchestratorService {
           console.log('🚫 Multi-Agent: No MCP prompt data found for task:', task.id);
         }
 
-        // Log follow-up prompt data if available
-        if (result.followUpPromptData) {
-          console.log('🔄 Multi-Agent: Processing follow-up prompt data:', {
-            taskId: task.id,
-            messageId: messageId
-          });
+        // Follow-up prompt data intentionally not logged to keep timeline concise
 
-          this.promptLogging.addPromptLog({
-            type: 'request',
-            provider: result.followUpPromptData.llmRequest.provider,
-            model: result.followUpPromptData.llmRequest.model,
-            content: result.followUpPromptData.llmRequest.content,
-            timestamp: new Date(),
-            sessionContext: `multi-agent-followup-${task.id}`,
-            messageId: messageId + '_followup',
-            status: 'completed',
-            title: `Task ${task.id} Follow-up Request`,
-            metadata: {
-              phase: 'execution',
-              taskId: task.id
-            }
-          });
-
-          this.promptLogging.addPromptLog({
-            type: 'response',
-            provider: result.followUpPromptData.llmResponse.provider,
-            model: result.followUpPromptData.llmResponse.model,
-            content: result.followUpPromptData.llmResponse.content,
-            timestamp: new Date(),
-            sessionContext: `multi-agent-followup-${task.id}`,
-            messageId: messageId + '_followup',
-            status: 'completed',
-            title: `Task ${task.id} Follow-up Response`,
-            metadata: {
-              phase: 'execution',
-              taskId: task.id
-            }
-          });
-        } else {
-          console.log('🚫 Multi-Agent: No follow-up prompt data found for task:', task.id);
-        }
+      } else {
+        console.log('🚫 Multi-Agent: No MCP prompt data found for task:', task.id);
       }
+
+      this.logger.logTaskComplete(task, result);
+
+      this.logPhaseEvent({
+        type: 'response',
+        title: `Task ${task.id} Execution Response`,
+        content: JSON.stringify(result, null, 2),
+        sessionContext: `multi-agent-executor-${task.id}`,
+        provider: 'Task Executor',
+        model: executorModel,
+        status: 'completed',
+        metadata: {
+          phase: 'execution',
+          taskId: task.id
+        },
+        sequence: 40
+      });
 
       // Store result for dependent tasks
       this.taskManager.setTaskResult(task.id, result);
@@ -735,7 +715,8 @@ export class MultiAgentOrchestratorService {
       metadata: {
         phase: 'execution',
         taskIds: taskIdList
-      }
+      },
+      sequence: 10
     });
 
     // Log to prompt logging if enabled
@@ -779,20 +760,6 @@ export class MultiAgentOrchestratorService {
         });
       }
 
-      this.logPhaseEvent({
-        type: 'response',
-        title: `Tasks ${taskLabel} Execution Response`,
-        content: JSON.stringify(result, null, 2),
-        sessionContext: `multi-agent-multi-task-executor`,
-        provider: 'Multi-task Executor',
-        model: multiTaskModel,
-        status: 'completed',
-        metadata: {
-          phase: 'execution',
-          taskIds: taskIdList
-        }
-      });
-
       this.logger.logPhase('execution', {
         taskCount: tasks.length,
         success: result.success,
@@ -816,7 +783,8 @@ export class MultiAgentOrchestratorService {
             title: 'Multi-task LLM Request',
             metadata: {
               phase: 'execution',
-              taskIds: taskIdList
+              taskIds: taskIdList,
+              sequence: 20
             }
           });
         }
@@ -834,7 +802,8 @@ export class MultiAgentOrchestratorService {
             title: 'Multi-task LLM Response',
             metadata: {
               phase: 'execution',
-              taskIds: taskIdList
+              taskIds: taskIdList,
+              sequence: 30
             }
           });
         }
@@ -862,7 +831,8 @@ export class MultiAgentOrchestratorService {
                 title: `Tool Call Request · ${mcpData.mcpRequest.toolName}`,
                 metadata: {
                   phase: 'execution',
-                  taskIds: taskIdList
+                  taskIds: taskIdList,
+                  sequence: 25
                 }
               });
             }
@@ -881,7 +851,8 @@ export class MultiAgentOrchestratorService {
                 title: `Tool Call Response · ${mcpData.mcpRequest?.toolName || 'MCP Tool'}`,
                 metadata: {
                   phase: 'execution',
-                  taskIds: taskIdList
+                  taskIds: taskIdList,
+                  sequence: 35
                 }
               });
             }
@@ -890,6 +861,21 @@ export class MultiAgentOrchestratorService {
           console.log('🚫 Multi-Agent Multi-Task: No MCP prompt data found');
         }
       }
+
+      this.logPhaseEvent({
+        type: 'response',
+        title: `Tasks ${taskLabel} Execution Response`,
+        content: JSON.stringify(result, null, 2),
+        sessionContext: `multi-agent-multi-task-executor`,
+        provider: 'Multi-task Executor',
+        model: multiTaskModel,
+        status: 'completed',
+        metadata: {
+          phase: 'execution',
+          taskIds: taskIdList
+        },
+        sequence: 40
+      });
 
       return result;
     } catch (error) {
@@ -945,7 +931,8 @@ export class MultiAgentOrchestratorService {
       status: 'pending',
       metadata: {
         phase: 'verification'
-      }
+      },
+      sequence: 10
     });
 
     // Log to prompt logging if enabled
@@ -991,18 +978,6 @@ export class MultiAgentOrchestratorService {
         });
       }
 
-      this.logPhaseEvent({
-        type: 'response',
-        title: 'Verification Response',
-        content: JSON.stringify(verificationResult, null, 2),
-        sessionContext: 'multi-agent-verifier',
-        provider: 'Result Verifier',
-        model: verifierModel,
-        status: 'completed',
-        metadata: {
-          phase: 'verification'
-        }
-      });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       if (verifierLogId) {
@@ -1037,7 +1012,8 @@ export class MultiAgentOrchestratorService {
           status: 'completed',
           title: 'Verification LLM Request',
           metadata: {
-            phase: 'verification'
+            phase: 'verification',
+            sequence: 20
           }
         });
       }
@@ -1054,12 +1030,27 @@ export class MultiAgentOrchestratorService {
           status: 'completed',
           title: 'Verification LLM Response',
           metadata: {
-            phase: 'verification'
+            phase: 'verification',
+            sequence: 30
           }
         });
       }
     }
-    
+
+    this.logPhaseEvent({
+      type: 'response',
+      title: 'Verification Response',
+      content: JSON.stringify(verificationResult, null, 2),
+      sessionContext: 'multi-agent-verifier',
+      provider: 'Result Verifier',
+      model: verifierModel,
+      status: 'completed',
+      metadata: {
+        phase: 'verification'
+      },
+      sequence: 40
+    });
+
     return verificationResult;
   }
 
@@ -1093,7 +1084,8 @@ export class MultiAgentOrchestratorService {
       status: 'pending',
       metadata: {
         phase: 'critic'
-      }
+      },
+      sequence: 10
     });
 
     // Log to prompt logging if enabled
@@ -1139,18 +1131,6 @@ export class MultiAgentOrchestratorService {
         });
       }
 
-      this.logPhaseEvent({
-        type: 'response',
-        title: 'Critic Response',
-        content: JSON.stringify(result, null, 2),
-        sessionContext: 'multi-agent-critic',
-        provider: 'Response Critic',
-        model: criticModel,
-        status: 'completed',
-        metadata: {
-          phase: 'critic'
-        }
-      });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       if (criticLogId) {
@@ -1185,7 +1165,8 @@ export class MultiAgentOrchestratorService {
           status: 'completed',
           title: 'Critic LLM Request',
           metadata: {
-            phase: 'critic'
+            phase: 'critic',
+            sequence: 20
           }
         });
       }
@@ -1202,11 +1183,26 @@ export class MultiAgentOrchestratorService {
           status: 'completed',
           title: 'Critic LLM Response',
           metadata: {
-            phase: 'critic'
+            phase: 'critic',
+            sequence: 30
           }
         });
       }
     }
+
+    this.logPhaseEvent({
+      type: 'response',
+      title: 'Critic Response',
+      content: JSON.stringify(result, null, 2),
+      sessionContext: 'multi-agent-critic',
+      provider: 'Response Critic',
+      model: criticModel,
+      status: 'completed',
+      metadata: {
+        phase: 'critic'
+      },
+      sequence: 40
+    });
 
     return result.finalAnswer || result.answer || 'No answer generated';
   }

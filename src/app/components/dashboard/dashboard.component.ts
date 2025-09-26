@@ -1255,7 +1255,24 @@ export class DashboardComponent implements OnInit, OnDestroy {
       }))
     ];
 
-    combined.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+    combined.sort((a, b) => {
+      const timeDiff = a.timestamp.getTime() - b.timestamp.getTime();
+      if (timeDiff !== 0) {
+        return timeDiff;
+      }
+
+      const seqA = this.getTimelineSequence(a);
+      const seqB = this.getTimelineSequence(b);
+      if (seqA !== seqB) {
+        return seqA - seqB;
+      }
+
+      if (a.kind === 'prompt' && b.kind === 'prompt' && a.prompt && b.prompt) {
+        return a.prompt.id.localeCompare(b.prompt.id);
+      }
+
+      return 0;
+    });
 
     const lengthIncreased = combined.length > this.previousGeneralTimelineLength;
     this.generalTimeline = combined;
@@ -1277,6 +1294,15 @@ export class DashboardComponent implements OnInit, OnDestroy {
       return true;
     }
     return context.startsWith('multi-agent');
+  }
+
+  private getTimelineSequence(entry: GeneralTimelineEntry): number {
+    if (entry.kind === 'prompt') {
+      const sequenceValue = entry.prompt?.metadata?.['sequence'];
+      return typeof sequenceValue === 'number' ? sequenceValue : 500;
+    }
+    // Regular chat messages should appear first when timestamps match
+    return 0;
   }
 
   trackTimelineEntry(index: number, entry: GeneralTimelineEntry): string {

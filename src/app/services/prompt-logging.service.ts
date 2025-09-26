@@ -87,9 +87,13 @@ export class PromptLoggingService {
         return log;
       }
 
+      const { metadata, ...rest } = patch;
+      const mergedMetadata = metadata ? { ...log.metadata, ...metadata } : log.metadata;
+
       return {
         ...log,
-        ...patch,
+        ...rest,
+        metadata: mergedMetadata,
         // Preserve original timestamp unless explicitly overridden
         timestamp: patch.timestamp ? patch.timestamp : log.timestamp
       };

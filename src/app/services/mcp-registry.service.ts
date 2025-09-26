@@ -257,7 +257,8 @@ export class McpRegistryService {
         status: 'pending',
         title: `Tool Call Request · ${toolCall.toolName}`,
         metadata: {
-          toolName: toolCall.toolName
+          toolName: toolCall.toolName,
+          sequence: 25
         }
       });
     }
@@ -316,7 +317,8 @@ export class McpRegistryService {
         status: 'completed',
         title: `Tool Call Response · ${toolCall.toolName}`,
         metadata: {
-          toolName: toolCall.toolName
+          toolName: toolCall.toolName,
+          sequence: 35
         }
       });
     }
