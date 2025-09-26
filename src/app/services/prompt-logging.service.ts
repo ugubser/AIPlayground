@@ -9,9 +9,20 @@ export interface PromptLogEntry {
   timestamp: Date;
   content: string;
   expanded: boolean;
-  sessionContext?: 'rag' | 'general' | 'vision' | 'mcp' | 'mcp-tool-call' | 'multi-agent-planner' | 'multi-agent-verifier' | 'multi-agent-critic' | string;
+  sessionContext?:
+    | 'rag'
+    | 'general'
+    | 'vision'
+    | 'mcp'
+    | 'mcp-tool-call'
+    | 'multi-agent-planner'
+    | 'multi-agent-verifier'
+    | 'multi-agent-critic'
+    | string;
   messageId?: string;
   metadata?: Record<string, any>;
+  title?: string;
+  status?: 'pending' | 'completed' | 'error';
 }
 
 @Injectable({
@@ -37,9 +48,9 @@ export class PromptLoggingService {
     return this.isLoggingEnabled;
   }
 
-  addPromptLog(entry: Omit<PromptLogEntry, 'id' | 'expanded'>): void {
+  addPromptLog(entry: Omit<PromptLogEntry, 'id' | 'expanded'>): string {
     if (!this.isLoggingEnabled) {
-      return;
+      return '';
     }
 
     const newEntry: PromptLogEntry = {
@@ -50,6 +61,8 @@ export class PromptLoggingService {
 
     const currentLogs = this.promptLogsSubject.value;
     this.promptLogsSubject.next([...currentLogs, newEntry]);
+
+    return newEntry.id;
   }
 
   clearLogsForContext(context?: string): void {
@@ -61,6 +74,28 @@ export class PromptLoggingService {
     const currentLogs = this.promptLogsSubject.value;
     const filteredLogs = currentLogs.filter(log => log.sessionContext !== context);
     this.promptLogsSubject.next(filteredLogs);
+  }
+
+  updatePromptLog(entryId: string, patch: Partial<PromptLogEntry>): void {
+    if (!entryId) {
+      return;
+    }
+
+    const currentLogs = this.promptLogsSubject.value;
+    const updatedLogs = currentLogs.map(log => {
+      if (log.id !== entryId) {
+        return log;
+      }
+
+      return {
+        ...log,
+        ...patch,
+        // Preserve original timestamp unless explicitly overridden
+        timestamp: patch.timestamp ? patch.timestamp : log.timestamp
+      };
+    });
+
+    this.promptLogsSubject.next(updatedLogs);
   }
 
   toggleExpanded(entryId: string): void {
@@ -101,10 +136,6 @@ export class PromptLoggingService {
   }
 
   updatePromptLogMessageId(entryId: string, messageId: string): void {
-    const currentLogs = this.promptLogsSubject.value;
-    const updatedLogs = currentLogs.map(log => 
-      log.id === entryId ? { ...log, messageId: messageId } : log
-    );
-    this.promptLogsSubject.next(updatedLogs);
+    this.updatePromptLog(entryId, { messageId });
   }
 }

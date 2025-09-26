@@ -355,28 +355,26 @@
 
       <div class="messages-container">
         <div class="messages-list" #generalMessagesContainer>
-          <ng-container *ngFor="let message of generalMessages; let i = index">
-            <div 
-              class="message"
-              [class.user-message]="message.role === 'user'"
-              [class.assistant-message]="message.role === 'assistant'">
-              
-              <div class="message-content">
-                <div class="message-text">
-                  <markdown [data]="message.content"></markdown>
+          <ng-container *ngFor="let entry of generalTimeline; trackBy: trackTimelineEntry">
+            <ng-container [ngSwitch]="entry.kind">
+              <div 
+                *ngSwitchCase="'message'"
+                class="message"
+                [class.user-message]="entry.message!.role === 'user'"
+                [class.assistant-message]="entry.message!.role === 'assistant'">
+                <div class="message-content">
+                  <div class="message-text">
+                    <markdown [data]="entry.message!.content"></markdown>
+                  </div>
+                </div>
+                <div class="message-time">
+                  {{ entry.message!.createdAt.toLocaleTimeString() }}
                 </div>
               </div>
-              
-              <div class="message-time">
-                {{ message.createdAt.toLocaleTimeString() }}
-              </div>
-            </div>
 
-            <!-- Show prompt logs after assistant messages -->
-            <ng-container *ngIf="message.role === 'assistant' && message.id">
-              <app-prompt-message 
-                *ngFor="let promptLog of getPromptLogsForMessage(message.id); trackBy: trackByPromptId"
-                [entry]="promptLog">
+              <app-prompt-message
+                *ngSwitchCase="'prompt'"
+                [entry]="entry.prompt!">
               </app-prompt-message>
             </ng-container>
           </ng-container>

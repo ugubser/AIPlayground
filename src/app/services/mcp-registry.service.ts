@@ -244,15 +244,21 @@ export class McpRegistryService {
     const promptMessageId = messageId || `mcp_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
     // Log MCP query if prompt logging is enabled
+    let requestLogId = '';
     if (this.promptLogging.isLoggingActive()) {
-      this.promptLogging.addPromptLog({
+      requestLogId = this.promptLogging.addPromptLog({
         type: 'request',
         provider: 'MCP Server',
         model: server.name,
         content: `Tool: ${toolCall.toolName}\nArguments: ${JSON.stringify(toolCall.arguments, null, 2)}`,
         timestamp: new Date(),
         sessionContext: 'mcp-tool-call',
-        messageId: promptMessageId
+        messageId: promptMessageId,
+        status: 'pending',
+        title: `Tool Call Request · ${toolCall.toolName}`,
+        metadata: {
+          toolName: toolCall.toolName
+        }
       });
     }
 
@@ -270,17 +276,35 @@ export class McpRegistryService {
     });
 
     if (!response.ok) {
+      if (requestLogId) {
+        this.promptLogging.updatePromptLog(requestLogId, {
+          status: 'error',
+          content: `Tool: ${toolCall.toolName}\nArguments: ${JSON.stringify(toolCall.arguments, null, 2)}\nError: ${response.status} ${response.statusText}`
+        });
+      }
       throw new Error(`Tool call failed: ${response.statusText}`);
     }
 
     const data = await response.json();
 
     if (data.error) {
+      if (requestLogId) {
+        this.promptLogging.updatePromptLog(requestLogId, {
+          status: 'error',
+          content: `Tool: ${toolCall.toolName}\nArguments: ${JSON.stringify(toolCall.arguments, null, 2)}\nError: ${data.error.message}`
+        });
+      }
       throw new Error(`Tool error: ${data.error.message}`);
     }
 
     // Log MCP response if prompt logging is enabled
     if (this.promptLogging.isLoggingActive()) {
+      if (requestLogId) {
+        this.promptLogging.updatePromptLog(requestLogId, {
+          status: 'completed'
+        });
+      }
+
       this.promptLogging.addPromptLog({
         type: 'response',
         provider: 'MCP Server',
@@ -288,7 +312,12 @@ export class McpRegistryService {
         content: JSON.stringify(data.result, null, 2),
         timestamp: new Date(),
         sessionContext: 'mcp-tool-call',
-        messageId: promptMessageId
+        messageId: promptMessageId,
+        status: 'completed',
+        title: `Tool Call Response · ${toolCall.toolName}`,
+        metadata: {
+          toolName: toolCall.toolName
+        }
       });
     }
 

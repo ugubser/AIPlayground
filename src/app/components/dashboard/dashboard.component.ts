@@ -28,6 +28,13 @@ interface VisionMessage {
   createdAt: Date;
 }
 
+interface GeneralTimelineEntry {
+  kind: 'message' | 'prompt';
+  timestamp: Date;
+  message?: ChatMessage;
+  prompt?: PromptLogEntry;
+}
+
 @Component({
   selector: 'app-dashboard',
   standalone: true,
@@ -78,6 +85,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   // Prompt logging
   promptLogs: PromptLogEntry[] = [];
+  generalTimeline: GeneralTimelineEntry[] = [];
+  private previousGeneralTimelineLength = 0;
 
   // Vision functionality
   selectedImage: { url: string; name: string; size: number; file: File } | null = null;
@@ -137,6 +146,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private initializePromptLogging() {
     this.promptLogging.promptLogs$.subscribe(logs => {
       this.promptLogs = logs;
+      this.updateGeneralTimeline('prompt');
     });
   }
 
@@ -385,6 +395,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       createdAt: new Date()
     };
     this.generalMessages.push(userMessage);
+    this.updateGeneralTimeline('message');
     
     // Scroll to show the user message
     this.scrollToBottomAfterDelay(this.generalMessagesContainer);
@@ -403,6 +414,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
           this.globalModelSelection.getSelectionForRequest()
         );
         this.generalMessages.push(response);
+        this.updateGeneralTimeline('message');
       }
       
       // Scroll to show the assistant response
@@ -416,6 +428,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         content: errorContent,
         createdAt: new Date()
       });
+      this.updateGeneralTimeline('message');
       
       // Scroll to show the error message
       this.scrollToBottomAfterDelay(this.generalMessagesContainer);
@@ -555,6 +568,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
             content: this.formatThinkingContent(mcpResponse.answer),
             createdAt: new Date()
           });
+          this.updateGeneralTimeline('message');
           
           // Scroll to show the first response
           this.scrollToBottomAfterDelay(this.generalMessagesContainer);
@@ -599,6 +613,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
           content: this.formatAnswerContent(finalResponse.answer),
           createdAt: new Date()
         });
+        this.updateGeneralTimeline('message');
 
         // Update MCP prompt logs to use the final message ID
         this.updateMcpPromptLogs(finalMessageId);
@@ -614,6 +629,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
           content: mcpResponse.answer,
           createdAt: new Date()
         });
+        this.updateGeneralTimeline('message');
 
         // Update MCP prompt logs to use the conversation message ID
         this.updateMcpPromptLogs(conversationMessageId);
@@ -630,6 +646,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         content: errorContent,
         createdAt: new Date()
       });
+      this.updateGeneralTimeline('message');
       
       // Scroll to show the error message
       this.scrollToBottomAfterDelay(this.generalMessagesContainer);
@@ -652,6 +669,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         createdAt: new Date()
       };
       this.generalMessages.push(thinkingMessage);
+      this.updateGeneralTimeline('message');
       this.scrollToBottomAfterDelay(this.generalMessagesContainer);
 
       // Get current model selection (same logic as MCP flow)
@@ -704,6 +722,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
           content: orchestrationResponse.finalAnswer,
           createdAt: new Date()
         };
+        this.updateGeneralTimeline('message');
 
         // Update all multi-agent prompt logs to use this message ID
         this.updateMultiAgentPromptLogs(messageId);
@@ -727,6 +746,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
           content: `❌ **Multi-Agent Error**\n\n${errorMessage}`,
           createdAt: new Date()
         };
+        this.updateGeneralTimeline('message');
       }
 
       this.scrollToBottomAfterDelay(this.generalMessagesContainer);
@@ -741,6 +761,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         content: `❌ **Multi-Agent Error**\n\n${errorContent}`,
         createdAt: new Date()
       };
+      this.updateGeneralTimeline('message');
       
       this.scrollToBottomAfterDelay(this.generalMessagesContainer);
     } finally {
@@ -1216,6 +1237,57 @@ export class DashboardComponent implements OnInit, OnDestroy {
     });
 
     console.log(`Updated ${recentLogs.length} multi-agent and MCP prompt logs with message ID: ${messageId}`);
+  }
+
+  private updateGeneralTimeline(trigger: 'message' | 'prompt' = 'message'): void {
+    const relevantPrompts = this.promptLogs.filter(log => this.isGeneralPromptLog(log));
+
+    const combined: GeneralTimelineEntry[] = [
+      ...this.generalMessages.map(message => ({
+        kind: 'message' as const,
+        timestamp: message.createdAt,
+        message
+      })),
+      ...relevantPrompts.map(prompt => ({
+        kind: 'prompt' as const,
+        timestamp: prompt.timestamp,
+        prompt
+      }))
+    ];
+
+    combined.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+
+    const lengthIncreased = combined.length > this.previousGeneralTimelineLength;
+    this.generalTimeline = combined;
+    this.previousGeneralTimelineLength = combined.length;
+
+    if (
+      trigger === 'prompt' &&
+      lengthIncreased &&
+      this.activeTab === 'chat' &&
+      this.generalMessagesContainer
+    ) {
+      this.scrollToBottomAfterDelay(this.generalMessagesContainer);
+    }
+  }
+
+  private isGeneralPromptLog(log: PromptLogEntry): boolean {
+    const context = log.sessionContext || '';
+    if (context === 'general' || context === 'mcp' || context === 'mcp-tool-call') {
+      return true;
+    }
+    return context.startsWith('multi-agent');
+  }
+
+  trackTimelineEntry(index: number, entry: GeneralTimelineEntry): string {
+    if (entry.kind === 'prompt') {
+      return entry.prompt?.id || `prompt_${index}`;
+    }
+    const message = entry.message;
+    if (message?.id) {
+      return message.id;
+    }
+    return message ? `message_${message.createdAt.getTime()}_${index}` : `message_${index}`;
   }
 
   /**

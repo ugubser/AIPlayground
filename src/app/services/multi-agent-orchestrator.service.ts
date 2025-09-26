@@ -47,6 +47,7 @@ export class MultiAgentOrchestratorService {
   private readonly functionsUrl = environment.production 
     ? 'https://us-central1-aiplayground-6e5be.cloudfunctions.net'
     : 'http://127.0.0.1:5001/aiplayground-6e5be/us-central1';
+  private readonly defaultMcpModel = 'meta-llama/llama-4-maverick:free';
 
   constructor(
     private taskManager: TaskDependencyManagerService,
@@ -54,6 +55,33 @@ export class MultiAgentOrchestratorService {
     private mcpRegistry: McpRegistryService,
     private promptLogging: PromptLoggingService
   ) {}
+
+  private logPhaseEvent(options: {
+    type: 'request' | 'response';
+    title: string;
+    content: string;
+    sessionContext: string;
+    provider: string;
+    model?: string;
+    status?: 'pending' | 'completed' | 'error';
+    metadata?: Record<string, any>;
+  }): string {
+    if (!this.promptLogging.isLoggingActive()) {
+      return '';
+    }
+
+    return this.promptLogging.addPromptLog({
+      type: options.type,
+      provider: options.provider,
+      model: options.model,
+      content: options.content,
+      timestamp: new Date(),
+      sessionContext: options.sessionContext,
+      status: options.status,
+      title: options.title,
+      metadata: options.metadata
+    });
+  }
 
   async processQuery(
     query: string, 
@@ -140,6 +168,31 @@ export class MultiAgentOrchestratorService {
       seed: seed
     };
 
+    const plannerModel = modelSelection?.llm?.model || this.defaultMcpModel;
+    const plannerRequestSummary = {
+      query: query.substring(0, 500),
+      toolCount: plannerRequest.availableTools.length,
+      tools: plannerRequest.availableTools.map(tool => ({
+        name: tool.name,
+        serverId: tool.serverId
+      })),
+      temperature,
+      seed
+    };
+
+    const plannerRequestLogId = this.logPhaseEvent({
+      type: 'request',
+      title: 'Planning Request',
+      content: JSON.stringify(plannerRequestSummary, null, 2),
+      sessionContext: 'multi-agent-planner',
+      provider: 'Multi-Agent Planner',
+      model: plannerModel,
+      status: 'pending',
+      metadata: {
+        phase: 'planning'
+      }
+    });
+
     // Log to prompt logging if enabled
     if (this.promptLogging.isLoggingActive()) {
       console.log('🤖 Multi-Agent Planning Phase:', {
@@ -156,10 +209,44 @@ export class MultiAgentOrchestratorService {
     });
 
     if (!response.ok) {
+      this.promptLogging.updatePromptLog(plannerRequestLogId, {
+        status: 'error',
+        content: JSON.stringify(
+          {
+            ...plannerRequestSummary,
+            error: `${response.status} ${response.statusText}`
+          },
+          null,
+          2
+        )
+      });
       throw new Error(`Planner failed: ${response.statusText}`);
     }
 
     const plannerResponse = await response.json();
+
+    this.promptLogging.updatePromptLog(plannerRequestLogId, {
+      status: 'completed'
+    });
+
+    this.logPhaseEvent({
+      type: 'response',
+      title: 'Planning Response',
+      content: JSON.stringify({
+        taskCount: plannerResponse.tasks?.length || 0,
+        totalSteps: plannerResponse.totalSteps,
+        reasoning: plannerResponse.reasoning,
+        tasks: plannerResponse.tasks
+      }, null, 2),
+      sessionContext: 'multi-agent-planner',
+      provider: 'Multi-Agent Planner',
+      model: plannerModel,
+      status: 'completed',
+      metadata: {
+        phase: 'planning',
+        taskCount: plannerResponse.tasks?.length || 0
+      }
+    });
     
     // Log prompt data if available and enabled
     if (plannerResponse.promptData && (enablePromptLogging !== undefined ? enablePromptLogging : this.promptLogging.isLoggingActive())) {
@@ -173,7 +260,12 @@ export class MultiAgentOrchestratorService {
           content: plannerResponse.promptData.llmRequest.content,
           timestamp: new Date(),
           sessionContext: 'multi-agent-planner',
-          messageId: messageId
+          messageId: messageId,
+          status: 'completed',
+          title: 'Planning LLM Request',
+          metadata: {
+            phase: 'planning'
+          }
         });
       }
       
@@ -185,7 +277,12 @@ export class MultiAgentOrchestratorService {
           content: plannerResponse.promptData.llmResponse.content,
           timestamp: new Date(),
           sessionContext: 'multi-agent-planner',
-          messageId: messageId
+          messageId: messageId,
+          status: 'completed',
+          title: 'Planning LLM Response',
+          metadata: {
+            phase: 'planning'
+          }
         });
       }
     }
@@ -283,6 +380,10 @@ export class MultiAgentOrchestratorService {
     this.logger.logTaskStart(task);
     task.status = 'executing';
     
+    const executorModel = modelSelection?.llm?.model || this.defaultMcpModel;
+    let executorRequestLogId = '';
+    let executorRequestSummary: Record<string, any> = {};
+
     try {
       // Get results from dependent tasks
       const dependencyResults = this.taskManager.getDependencyResults(task.id);
@@ -322,6 +423,30 @@ export class MultiAgentOrchestratorService {
         preFilteredTools: taskTools // Pass pre-filtered tools to avoid server calls
       };
 
+      executorRequestSummary = {
+        taskId: task.id,
+        description: task.description,
+        tools: task.tools,
+        dependencyResults,
+        toolNames: taskTools.map(tool => tool.function.name),
+        temperature,
+        seed
+      };
+
+      executorRequestLogId = this.logPhaseEvent({
+        type: 'request',
+        title: `Task ${task.id} Execution Request`,
+        content: JSON.stringify(executorRequestSummary, null, 2),
+        sessionContext: `multi-agent-executor-${task.id}`,
+        provider: 'Task Executor',
+        model: executorModel,
+        status: 'pending',
+        metadata: {
+          phase: 'execution',
+          taskId: task.id
+        }
+      });
+
       // Log to prompt logging if enabled
       if (this.promptLogging.isLoggingActive()) {
         console.log(`⚡ Multi-Agent Executing Task: ${task.id}`, {
@@ -338,10 +463,42 @@ export class MultiAgentOrchestratorService {
       });
 
       if (!response.ok) {
+        if (executorRequestLogId) {
+          this.promptLogging.updatePromptLog(executorRequestLogId, {
+            status: 'error',
+            content: JSON.stringify(
+              {
+                ...executorRequestSummary,
+                error: `${response.status} ${response.statusText}`
+              },
+              null,
+              2
+            )
+          });
+        }
         throw new Error(`Executor failed: ${response.statusText}`);
       }
 
       const result = await response.json();
+      if (executorRequestLogId) {
+        this.promptLogging.updatePromptLog(executorRequestLogId, {
+          status: 'completed'
+        });
+      }
+
+      this.logPhaseEvent({
+        type: 'response',
+        title: `Task ${task.id} Execution Response`,
+        content: JSON.stringify(result, null, 2),
+        sessionContext: `multi-agent-executor-${task.id}`,
+        provider: 'Task Executor',
+        model: executorModel,
+        status: 'completed',
+        metadata: {
+          phase: 'execution',
+          taskId: task.id
+        }
+      });
       this.logger.logTaskComplete(task, result);
       
       // Log prompt data if available and enabled
@@ -356,7 +513,13 @@ export class MultiAgentOrchestratorService {
             content: result.promptData.llmRequest.content,
             timestamp: new Date(),
             sessionContext: `multi-agent-executor-${task.id}`,
-            messageId: messageId
+            messageId: messageId,
+            status: 'completed',
+            title: `Task ${task.id} LLM Request`,
+            metadata: {
+              phase: 'execution',
+              taskId: task.id
+            }
           });
         }
         
@@ -368,7 +531,13 @@ export class MultiAgentOrchestratorService {
             content: result.promptData.llmResponse.content,
             timestamp: new Date(),
             sessionContext: `multi-agent-executor-${task.id}`,
-            messageId: messageId
+            messageId: messageId,
+            status: 'completed',
+            title: `Task ${task.id} LLM Response`,
+            metadata: {
+              phase: 'execution',
+              taskId: task.id
+            }
           });
         }
 
@@ -390,7 +559,13 @@ export class MultiAgentOrchestratorService {
                 content: `Tool: ${mcpData.mcpRequest.toolName}\nArguments: ${JSON.stringify(mcpData.mcpRequest.arguments, null, 2)}`,
                 timestamp: new Date(),
                 sessionContext: 'mcp-tool-call',
-                messageId: messageId  // Use the main LLM message ID to group MCP logs with the assistant response
+                messageId: messageId,
+                status: 'completed',
+                title: `Tool Call Request · ${mcpData.mcpRequest.toolName}`,
+                metadata: {
+                  phase: 'execution',
+                  taskId: task.id
+                }
               });
             }
 
@@ -403,7 +578,13 @@ export class MultiAgentOrchestratorService {
                 content: JSON.stringify(mcpData.mcpResponse.result, null, 2),
                 timestamp: new Date(),
                 sessionContext: 'mcp-tool-call',
-                messageId: messageId  // Use the main LLM message ID to group MCP logs with the assistant response
+                messageId: messageId,
+                status: 'completed',
+                title: `Tool Call Response · ${mcpData.mcpRequest?.toolName || 'MCP Tool'}`,
+                metadata: {
+                  phase: 'execution',
+                  taskId: task.id
+                }
               });
             }
           }
@@ -425,7 +606,13 @@ export class MultiAgentOrchestratorService {
             content: result.followUpPromptData.llmRequest.content,
             timestamp: new Date(),
             sessionContext: `multi-agent-followup-${task.id}`,
-            messageId: messageId + '_followup'
+            messageId: messageId + '_followup',
+            status: 'completed',
+            title: `Task ${task.id} Follow-up Request`,
+            metadata: {
+              phase: 'execution',
+              taskId: task.id
+            }
           });
 
           this.promptLogging.addPromptLog({
@@ -435,7 +622,13 @@ export class MultiAgentOrchestratorService {
             content: result.followUpPromptData.llmResponse.content,
             timestamp: new Date(),
             sessionContext: `multi-agent-followup-${task.id}`,
-            messageId: messageId + '_followup'
+            messageId: messageId + '_followup',
+            status: 'completed',
+            title: `Task ${task.id} Follow-up Response`,
+            metadata: {
+              phase: 'execution',
+              taskId: task.id
+            }
           });
         } else {
           console.log('🚫 Multi-Agent: No follow-up prompt data found for task:', task.id);
@@ -449,6 +642,20 @@ export class MultiAgentOrchestratorService {
       
     } catch (error) {
       this.logger.logTaskError(task, error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      if (executorRequestLogId) {
+        this.promptLogging.updatePromptLog(executorRequestLogId, {
+          status: 'error',
+          content: JSON.stringify(
+            {
+              ...executorRequestSummary,
+              error: errorMessage
+            },
+            null,
+            2
+          )
+        });
+      }
       throw error;
     }
   }
@@ -462,6 +669,11 @@ export class MultiAgentOrchestratorService {
     availableTools?: any[]
   ): Promise<{taskResults: Record<string, any>; toolCalls: any[]; success: boolean; mcpPromptData?: any[]}> {
     console.log(`🔄 Multi-task executing ${tasks.length} tasks:`, tasks.map(t => t.id));
+
+    const multiTaskModel = modelSelection?.llm?.model || this.defaultMcpModel;
+    const taskIdList = tasks.map(t => t.id);
+    let multiTaskRequestLogId = '';
+    let multiTaskRequestSummary: Record<string, any> = {};
 
     // Prepare tasks for execution
     const multiTasks = tasks.map(task => ({
@@ -504,6 +716,28 @@ export class MultiAgentOrchestratorService {
       preFilteredTools: taskTools
     };
 
+    const taskLabel = taskIdList.slice(0, 3).join(', ') + (taskIdList.length > 3 ? ', …' : '');
+    multiTaskRequestSummary = {
+      taskIds: taskIdList,
+      tools: allRequiredTools,
+      temperature,
+      seed
+    };
+
+    multiTaskRequestLogId = this.logPhaseEvent({
+      type: 'request',
+      title: `Tasks ${taskLabel} Execution Request`,
+      content: JSON.stringify(multiTaskRequestSummary, null, 2),
+      sessionContext: `multi-agent-multi-task-executor`,
+      provider: 'Multi-task Executor',
+      model: multiTaskModel,
+      status: 'pending',
+      metadata: {
+        phase: 'execution',
+        taskIds: taskIdList
+      }
+    });
+
     // Log to prompt logging if enabled
     if (this.promptLogging.isLoggingActive()) {
       console.log(`⚡ Multi-Agent Multi-Task Execution:`, {
@@ -513,92 +747,168 @@ export class MultiAgentOrchestratorService {
       });
     }
 
-    const response = await fetch(`${this.functionsUrl}/multiAgentMultiTaskExecutor`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(multiTaskRequest)
-    });
+    try {
+      const response = await fetch(`${this.functionsUrl}/multiAgentMultiTaskExecutor`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(multiTaskRequest)
+      });
 
-    if (!response.ok) {
-      throw new Error(`Multi-task executor failed: ${response.statusText}`);
-    }
-
-    const result = await response.json();
-    this.logger.logPhase('execution', {
-      taskCount: tasks.length,
-      success: result.success,
-      toolCallsCount: result.toolCalls?.length || 0
-    });
-
-    // Log prompt data if available and enabled
-    if (result.promptData && (enablePromptLogging !== undefined ? enablePromptLogging : this.promptLogging.isLoggingActive())) {
-      const messageId = `multiagent_multitask_${tasks.map(t => t.id).join('_')}_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-
-      if (result.promptData.llmRequest) {
-        this.promptLogging.addPromptLog({
-          type: 'request',
-          provider: result.promptData.llmRequest.provider,
-          model: result.promptData.llmRequest.model,
-          content: result.promptData.llmRequest.content,
-          timestamp: new Date(),
-          sessionContext: `multi-agent-multi-task-executor`,
-          messageId: messageId
-        });
-      }
-
-      if (result.promptData.llmResponse) {
-        this.promptLogging.addPromptLog({
-          type: 'response',
-          provider: result.promptData.llmResponse.provider,
-          model: result.promptData.llmResponse.model,
-          content: result.promptData.llmResponse.content,
-          timestamp: new Date(),
-          sessionContext: `multi-agent-multi-task-executor`,
-          messageId: messageId
-        });
-      }
-
-      // Log MCP prompt data if available
-      if (result.mcpPromptData && Array.isArray(result.mcpPromptData)) {
-        console.log('🔧 Multi-Agent Multi-Task: Processing MCP prompt data:', {
-          taskCount: tasks.length,
-          mcpDataCount: result.mcpPromptData.length,
-          messageId: messageId
-        });
-
-        for (const mcpData of result.mcpPromptData) {
-          if (mcpData.mcpRequest) {
-            console.log('🟢 Multi-Agent Multi-Task: Adding MCP Query log');
-            this.promptLogging.addPromptLog({
-              type: 'request',
-              provider: 'MCP Server',
-              model: mcpData.mcpRequest.server,
-              content: `Tool: ${mcpData.mcpRequest.toolName}\nArguments: ${JSON.stringify(mcpData.mcpRequest.arguments, null, 2)}`,
-              timestamp: new Date(),
-              sessionContext: 'mcp-tool-call',
-              messageId: messageId
-            });
-          }
-
-          if (mcpData.mcpResponse) {
-            console.log('🔵 Multi-Agent Multi-Task: Adding MCP Response log');
-            this.promptLogging.addPromptLog({
-              type: 'response',
-              provider: 'MCP Server',
-              model: mcpData.mcpResponse.server,
-              content: JSON.stringify(mcpData.mcpResponse.result, null, 2),
-              timestamp: new Date(),
-              sessionContext: 'mcp-tool-call',
-              messageId: messageId
-            });
-          }
+      if (!response.ok) {
+        if (multiTaskRequestLogId) {
+          this.promptLogging.updatePromptLog(multiTaskRequestLogId, {
+            status: 'error',
+            content: JSON.stringify(
+              {
+                ...multiTaskRequestSummary,
+                error: `${response.status} ${response.statusText}`
+              },
+              null,
+              2
+            )
+          });
         }
-      } else {
-        console.log('🚫 Multi-Agent Multi-Task: No MCP prompt data found');
+        throw new Error(`Multi-task executor failed: ${response.statusText}`);
       }
-    }
 
-    return result;
+      const result = await response.json();
+
+      if (multiTaskRequestLogId) {
+        this.promptLogging.updatePromptLog(multiTaskRequestLogId, {
+          status: 'completed'
+        });
+      }
+
+      this.logPhaseEvent({
+        type: 'response',
+        title: `Tasks ${taskLabel} Execution Response`,
+        content: JSON.stringify(result, null, 2),
+        sessionContext: `multi-agent-multi-task-executor`,
+        provider: 'Multi-task Executor',
+        model: multiTaskModel,
+        status: 'completed',
+        metadata: {
+          phase: 'execution',
+          taskIds: taskIdList
+        }
+      });
+
+      this.logger.logPhase('execution', {
+        taskCount: tasks.length,
+        success: result.success,
+        toolCallsCount: result.toolCalls?.length || 0
+      });
+
+      // Log prompt data if available and enabled
+      if (result.promptData && (enablePromptLogging !== undefined ? enablePromptLogging : this.promptLogging.isLoggingActive())) {
+        const messageId = `multiagent_multitask_${tasks.map(t => t.id).join('_')}_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+
+        if (result.promptData.llmRequest) {
+          this.promptLogging.addPromptLog({
+            type: 'request',
+            provider: result.promptData.llmRequest.provider,
+            model: result.promptData.llmRequest.model,
+            content: result.promptData.llmRequest.content,
+            timestamp: new Date(),
+            sessionContext: `multi-agent-multi-task-executor`,
+            messageId: messageId,
+            status: 'completed',
+            title: 'Multi-task LLM Request',
+            metadata: {
+              phase: 'execution',
+              taskIds: taskIdList
+            }
+          });
+        }
+
+        if (result.promptData.llmResponse) {
+          this.promptLogging.addPromptLog({
+            type: 'response',
+            provider: result.promptData.llmResponse.provider,
+            model: result.promptData.llmResponse.model,
+            content: result.promptData.llmResponse.content,
+            timestamp: new Date(),
+            sessionContext: `multi-agent-multi-task-executor`,
+            messageId: messageId,
+            status: 'completed',
+            title: 'Multi-task LLM Response',
+            metadata: {
+              phase: 'execution',
+              taskIds: taskIdList
+            }
+          });
+        }
+
+        // Log MCP prompt data if available
+        if (result.mcpPromptData && Array.isArray(result.mcpPromptData)) {
+          console.log('🔧 Multi-Agent Multi-Task: Processing MCP prompt data:', {
+            taskCount: tasks.length,
+            mcpDataCount: result.mcpPromptData.length,
+            messageId: messageId
+          });
+
+          for (const mcpData of result.mcpPromptData) {
+            if (mcpData.mcpRequest) {
+              console.log('🟢 Multi-Agent Multi-Task: Adding MCP Query log');
+              this.promptLogging.addPromptLog({
+                type: 'request',
+                provider: 'MCP Server',
+                model: mcpData.mcpRequest.server,
+                content: `Tool: ${mcpData.mcpRequest.toolName}\nArguments: ${JSON.stringify(mcpData.mcpRequest.arguments, null, 2)}`,
+                timestamp: new Date(),
+                sessionContext: 'mcp-tool-call',
+                messageId: messageId,
+                status: 'completed',
+                title: `Tool Call Request · ${mcpData.mcpRequest.toolName}`,
+                metadata: {
+                  phase: 'execution',
+                  taskIds: taskIdList
+                }
+              });
+            }
+
+            if (mcpData.mcpResponse) {
+              console.log('🔵 Multi-Agent Multi-Task: Adding MCP Response log');
+              this.promptLogging.addPromptLog({
+                type: 'response',
+                provider: 'MCP Server',
+                model: mcpData.mcpResponse.server,
+                content: JSON.stringify(mcpData.mcpResponse.result, null, 2),
+                timestamp: new Date(),
+                sessionContext: 'mcp-tool-call',
+                messageId: messageId,
+                status: 'completed',
+                title: `Tool Call Response · ${mcpData.mcpRequest?.toolName || 'MCP Tool'}`,
+                metadata: {
+                  phase: 'execution',
+                  taskIds: taskIdList
+                }
+              });
+            }
+          }
+        } else {
+          console.log('🚫 Multi-Agent Multi-Task: No MCP prompt data found');
+        }
+      }
+
+      return result;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      if (multiTaskRequestLogId) {
+        this.promptLogging.updatePromptLog(multiTaskRequestLogId, {
+          status: 'error',
+          content: JSON.stringify(
+            {
+              ...multiTaskRequestSummary,
+              error: errorMessage
+            },
+            null,
+            2
+          )
+        });
+      }
+      throw error;
+    }
   }
 
   private async verificationPhase(tasks: Task[], originalQuery: string, modelSelection?: any, temperature?: number, seed?: number, enablePromptLogging?: boolean): Promise<any> {
@@ -617,6 +927,27 @@ export class MultiAgentOrchestratorService {
       seed: seed
     };
 
+    const verifierModel = modelSelection?.llm?.model || this.defaultMcpModel;
+    const verifierRequestSummary = {
+      originalQuery: originalQuery.substring(0, 500),
+      taskCount: completedTasks.length,
+      temperature,
+      seed
+    };
+
+    const verifierLogId = this.logPhaseEvent({
+      type: 'request',
+      title: 'Verification Request',
+      content: JSON.stringify(verifierRequestSummary, null, 2),
+      sessionContext: 'multi-agent-verifier',
+      provider: 'Result Verifier',
+      model: verifierModel,
+      status: 'pending',
+      metadata: {
+        phase: 'verification'
+      }
+    });
+
     // Log to prompt logging if enabled
     if (this.promptLogging.isLoggingActive()) {
       console.log('✅ Multi-Agent Verification Phase:', {
@@ -626,17 +957,69 @@ export class MultiAgentOrchestratorService {
       });
     }
 
-    const response = await fetch(`${this.functionsUrl}/multiAgentVerifier`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(verifierRequest)
-    });
+    let verificationResult: any;
 
-    if (!response.ok) {
-      throw new Error(`Verifier failed: ${response.statusText}`);
+    try {
+      const response = await fetch(`${this.functionsUrl}/multiAgentVerifier`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(verifierRequest)
+      });
+
+      if (!response.ok) {
+        if (verifierLogId) {
+          this.promptLogging.updatePromptLog(verifierLogId, {
+            status: 'error',
+            content: JSON.stringify(
+              {
+                ...verifierRequestSummary,
+                error: `${response.status} ${response.statusText}`
+              },
+              null,
+              2
+            )
+          });
+        }
+        throw new Error(`Verifier failed: ${response.statusText}`);
+      }
+
+      verificationResult = await response.json();
+
+      if (verifierLogId) {
+        this.promptLogging.updatePromptLog(verifierLogId, {
+          status: 'completed'
+        });
+      }
+
+      this.logPhaseEvent({
+        type: 'response',
+        title: 'Verification Response',
+        content: JSON.stringify(verificationResult, null, 2),
+        sessionContext: 'multi-agent-verifier',
+        provider: 'Result Verifier',
+        model: verifierModel,
+        status: 'completed',
+        metadata: {
+          phase: 'verification'
+        }
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      if (verifierLogId) {
+        this.promptLogging.updatePromptLog(verifierLogId, {
+          status: 'error',
+          content: JSON.stringify(
+            {
+              ...verifierRequestSummary,
+              error: errorMessage
+            },
+            null,
+            2
+          )
+        });
+      }
+      throw error;
     }
-
-    const verificationResult = await response.json();
     
     // Log prompt data if available and enabled
     if (verificationResult.promptData && (enablePromptLogging !== undefined ? enablePromptLogging : this.promptLogging.isLoggingActive())) {
@@ -650,7 +1033,12 @@ export class MultiAgentOrchestratorService {
           content: verificationResult.promptData.llmRequest.content,
           timestamp: new Date(),
           sessionContext: 'multi-agent-verifier',
-          messageId: messageId
+          messageId: messageId,
+          status: 'completed',
+          title: 'Verification LLM Request',
+          metadata: {
+            phase: 'verification'
+          }
         });
       }
       
@@ -662,7 +1050,12 @@ export class MultiAgentOrchestratorService {
           content: verificationResult.promptData.llmResponse.content,
           timestamp: new Date(),
           sessionContext: 'multi-agent-verifier',
-          messageId: messageId
+          messageId: messageId,
+          status: 'completed',
+          title: 'Verification LLM Response',
+          metadata: {
+            phase: 'verification'
+          }
         });
       }
     }
@@ -681,6 +1074,28 @@ export class MultiAgentOrchestratorService {
       seed: seed
     };
 
+    const criticModel = modelSelection?.llm?.model || this.defaultMcpModel;
+    const criticRequestSummary = {
+      originalQuery: originalQuery.substring(0, 500),
+      confidence: verification.confidence,
+      overallCorrect: verification.overallCorrect,
+      temperature,
+      seed
+    };
+
+    const criticLogId = this.logPhaseEvent({
+      type: 'request',
+      title: 'Critic Request',
+      content: JSON.stringify(criticRequestSummary, null, 2),
+      sessionContext: 'multi-agent-critic',
+      provider: 'Response Critic',
+      model: criticModel,
+      status: 'pending',
+      metadata: {
+        phase: 'critic'
+      }
+    });
+
     // Log to prompt logging if enabled
     if (this.promptLogging.isLoggingActive()) {
       console.log('🎨 Multi-Agent Critic Phase:', {
@@ -690,17 +1105,69 @@ export class MultiAgentOrchestratorService {
       });
     }
 
-    const response = await fetch(`${this.functionsUrl}/multiAgentCritic`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(criticRequest)
-    });
+    let result: any;
 
-    if (!response.ok) {
-      throw new Error(`Critic failed: ${response.statusText}`);
+    try {
+      const response = await fetch(`${this.functionsUrl}/multiAgentCritic`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(criticRequest)
+      });
+
+      if (!response.ok) {
+        if (criticLogId) {
+          this.promptLogging.updatePromptLog(criticLogId, {
+            status: 'error',
+            content: JSON.stringify(
+              {
+                ...criticRequestSummary,
+                error: `${response.status} ${response.statusText}`
+              },
+              null,
+              2
+            )
+          });
+        }
+        throw new Error(`Critic failed: ${response.statusText}`);
+      }
+
+      result = await response.json();
+
+      if (criticLogId) {
+        this.promptLogging.updatePromptLog(criticLogId, {
+          status: 'completed'
+        });
+      }
+
+      this.logPhaseEvent({
+        type: 'response',
+        title: 'Critic Response',
+        content: JSON.stringify(result, null, 2),
+        sessionContext: 'multi-agent-critic',
+        provider: 'Response Critic',
+        model: criticModel,
+        status: 'completed',
+        metadata: {
+          phase: 'critic'
+        }
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      if (criticLogId) {
+        this.promptLogging.updatePromptLog(criticLogId, {
+          status: 'error',
+          content: JSON.stringify(
+            {
+              ...criticRequestSummary,
+              error: errorMessage
+            },
+            null,
+            2
+          )
+        });
+      }
+      throw error;
     }
-
-    const result = await response.json();
     
     // Log prompt data if available and enabled
     if (result.promptData && (enablePromptLogging !== undefined ? enablePromptLogging : this.promptLogging.isLoggingActive())) {
@@ -714,7 +1181,12 @@ export class MultiAgentOrchestratorService {
           content: result.promptData.llmRequest.content,
           timestamp: new Date(),
           sessionContext: 'multi-agent-critic',
-          messageId: messageId
+          messageId: messageId,
+          status: 'completed',
+          title: 'Critic LLM Request',
+          metadata: {
+            phase: 'critic'
+          }
         });
       }
       
@@ -726,11 +1198,16 @@ export class MultiAgentOrchestratorService {
           content: result.promptData.llmResponse.content,
           timestamp: new Date(),
           sessionContext: 'multi-agent-critic',
-          messageId: messageId
+          messageId: messageId,
+          status: 'completed',
+          title: 'Critic LLM Response',
+          metadata: {
+            phase: 'critic'
+          }
         });
       }
     }
-    
+
     return result.finalAnswer || result.answer || 'No answer generated';
   }
 
