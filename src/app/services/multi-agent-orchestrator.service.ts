@@ -4,6 +4,7 @@ import { ExecutionLoggerService } from './execution-logger.service';
 import { McpRegistryService } from './mcp-registry.service';
 import { PromptLoggingService } from './prompt-logging.service';
 import { environment } from '../../environments/environment';
+import { MathRenderingService } from './math-rendering.service';
 
 export interface Task {
   id: string;
@@ -53,7 +54,8 @@ export class MultiAgentOrchestratorService {
     private taskManager: TaskDependencyManagerService,
     private logger: ExecutionLoggerService,
     private mcpRegistry: McpRegistryService,
-    private promptLogging: PromptLoggingService
+    private promptLogging: PromptLoggingService,
+    private mathRenderer: MathRenderingService
   ) {}
 
   private logPhaseEvent(options: {
@@ -136,8 +138,10 @@ export class MultiAgentOrchestratorService {
         this.logger.logPhase('critic', { answerLength: finalAnswer.length });
       }
       
+      const formattedFinalAnswer = await this.mathRenderer.transformMarkdown(finalAnswer);
+
       const response: MultiAgentResponse = {
-        finalAnswer,
+        finalAnswer: formattedFinalAnswer,
         executionLog: this.logger.getExecutionLog(),
         tasks: executedTasks,
         success: true

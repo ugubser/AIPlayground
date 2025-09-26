@@ -121,6 +121,35 @@ body {
   background-color: var(--color-background);
 }
 
+.math-render-inline {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+
+.math-render-block {
+  display: flex;
+  justify-content: center;
+  margin: 1rem 0;
+}
+
+.math-render-block img,
+.math-render-inline img {
+  max-width: 100%;
+  height: auto;
+  fill: currentColor;
+}
+
+.math-render-image {
+  display: block;
+  margin: 0 auto;
+}
+
+.math-render-inline-image {
+  display: inline-block;
+  vertical-align: middle;
+}
+
 /* Typography Scale */
 h1, h2, h3, h4, h5, h6 {
   margin: 0 0 var(--space-4) 0;

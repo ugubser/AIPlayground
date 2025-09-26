@@ -7,6 +7,7 @@ import { McpService } from './mcp.service';
 import { McpRegistryService, McpToolCall } from './mcp-registry.service';
 import { PromptLoggingService } from './prompt-logging.service';
 import { GlobalModelSelectionService } from './global-model-selection.service';
+import { MathRenderingService } from './math-rendering.service';
 
 export interface ChatSession {
   id?: string;
@@ -72,7 +73,8 @@ export class ChatService {
     private mcpService: McpService,
     private mcpRegistry: McpRegistryService,
     private promptLogging: PromptLoggingService,
-    private globalModelSelection: GlobalModelSelectionService
+    private globalModelSelection: GlobalModelSelectionService,
+    private mathRenderer: MathRenderingService
   ) { }
 
   async createSession(title?: string, associatedDocuments?: string[]): Promise<string> {
@@ -183,9 +185,11 @@ export class ChatService {
       const { data } = await this.chatRag(ragRequest);
 
       // Save assistant message first to get the ID
+      const formattedAnswer = await this.mathRenderer.transformMarkdown(data.answer);
+
       const assistantMessage: Omit<ChatMessage, 'id'> = {
         role: 'assistant',
-        content: data.answer,
+        content: formattedAnswer,
         sources: data.sources,
         createdAt: new Date()
       };
@@ -351,7 +355,7 @@ export class ChatService {
       return {
         id: messageId,
         role: 'assistant',
-        content: data.answer,
+        content: await this.mathRenderer.transformMarkdown(data.answer),
         createdAt: new Date()
       };
 
@@ -440,7 +444,7 @@ export class ChatService {
       return {
         id: messageId,
         role: 'assistant',
-        content: data.answer,
+        content: await this.mathRenderer.transformMarkdown(data.answer),
         createdAt: new Date()
       };
 
@@ -598,7 +602,7 @@ export class ChatService {
       }
 
       return {
-        answer: data.answer,
+        answer: await this.mathRenderer.transformMarkdown(data.answer),
         toolCalls: data.toolCalls as { name: string; arguments: Record<string, any> }[],
         messageId: messageId
       };
