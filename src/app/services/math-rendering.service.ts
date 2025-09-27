@@ -89,13 +89,16 @@ export class MathRenderingService {
     const fenceRegex = /```svg\s+([\s\S]*?)```/gi;
 
     return input.replace(fenceRegex, (match, rawContent) => {
+      console.log('[MathRenderingService] Converting SVG fence');
       const trimmed = rawContent.trim();
       if (!trimmed) {
+        console.log('[MathRenderingService] Fence empty, skipping');
         return match;
       }
 
       const svgContent = trimmed.replace(/^[^<]*<\?xml[^>]*\?>\s*/i, '');
       if (!svgContent.trim().toLowerCase().startsWith('<svg')) {
+        console.log('[MathRenderingService] Fence content not SVG, skipping');
         return match;
       }
 
@@ -103,6 +106,7 @@ export class MathRenderingService {
         const dataUri = this.svgToDataUri(svgContent.trim());
         const titleMatch = svgContent.match(/<title>([\s\S]*?)<\/title>/i);
         const alt = this.createAltText(titleMatch ? titleMatch[1] : 'Generated SVG graphic');
+        console.log('[MathRenderingService] Fence converted successfully');
         return `\n<div class="svg-embedded-block"><img class="svg-embedded-image" src="${dataUri}" alt="${alt}"></div>\n`;
       } catch (error) {
         console.warn('Failed to embed SVG code fence, leaving original content', { error });

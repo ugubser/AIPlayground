@@ -18,6 +18,7 @@ import { ErrorHandlerService } from '../../services/error-handler.service';
 import { LoggingService } from '../../services/logging.service';
 import { SharedUtilsService } from '../../utils/shared-utils.service';
 import { PromptLoggingService, PromptLogEntry } from '../../services/prompt-logging.service';
+import { MathRenderingService } from '../../services/math-rendering.service';
 
 interface VisionMessage {
   id?: string;
@@ -108,7 +109,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
     private errorHandler: ErrorHandlerService,
     private logger: LoggingService,
     private utils: SharedUtilsService,
-    private promptLogging: PromptLoggingService
+    private promptLogging: PromptLoggingService,
+    private mathRenderer: MathRenderingService
   ) {}
 
   private scrollToBottom(container: ElementRef, smooth: boolean = true) {
@@ -607,10 +609,12 @@ export class DashboardComponent implements OnInit, OnDestroy {
         );
         
         // Show the final response
+        const decoratedFinalAnswer = this.formatAnswerContent(finalResponse.answer);
+        const renderedFinalAnswer = await this.mathRenderer.transformMarkdown(decoratedFinalAnswer);
         this.generalMessages.push({
           id: finalMessageId,
           role: 'assistant',
-          content: this.formatAnswerContent(finalResponse.answer),
+          content: renderedFinalAnswer,
           createdAt: new Date()
         });
         this.updateGeneralTimeline('message');
@@ -623,10 +627,12 @@ export class DashboardComponent implements OnInit, OnDestroy {
         
       } else {
         // No tool calls, show response directly
+        const decoratedAnswer = this.formatAnswerContent(mcpResponse.answer);
+        const renderedAnswer = await this.mathRenderer.transformMarkdown(decoratedAnswer);
         this.generalMessages.push({
           id: conversationMessageId,
           role: 'assistant',
-          content: mcpResponse.answer,
+          content: renderedAnswer,
           createdAt: new Date()
         });
         this.updateGeneralTimeline('message');
@@ -713,13 +719,15 @@ export class DashboardComponent implements OnInit, OnDestroy {
       if (orchestrationResponse.success) {
         // Generate a unique message ID for this multi-agent response
         const messageId = `multiagent_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-        
+        const decoratedFinalAnswer = this.formatAnswerContent(orchestrationResponse.finalAnswer);
+        const renderedFinalAnswer = await this.mathRenderer.transformMarkdown(decoratedFinalAnswer);
+
         // Replace the thinking message with the final answer (with ID)
         const lastMessageIndex = this.generalMessages.length - 1;
         this.generalMessages[lastMessageIndex] = {
           id: messageId,
           role: 'assistant',
-          content: orchestrationResponse.finalAnswer,
+          content: renderedFinalAnswer,
           createdAt: new Date()
         };
         this.updateGeneralTimeline('message');
